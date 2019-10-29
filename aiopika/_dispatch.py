@@ -1,7 +1,7 @@
 import re
 import asyncio
 import typing
-import logging
+import aiologger
 
 from inspect import isclass
 from copy import copy
@@ -17,7 +17,7 @@ from ._frame import get_key
 __all__ = ['EventManagerObject', 'Waiter']
 
 
-LOGGER = logging.getLogger(__name__)
+LOGGER = aiologger.Logger.with_default_handlers(name=__name__)
 
 
 class Waiter(asyncio.Event):

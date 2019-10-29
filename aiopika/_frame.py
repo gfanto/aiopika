@@ -1,4 +1,4 @@
-import logging
+import aiologger
 import struct
 import asyncio
 
@@ -11,7 +11,7 @@ from . import frame
 from ._pika_compat import *
 
 
-LOGGER = logging.getLogger(__name__)
+LOGGER = aiologger.Logger.with_default_handlers(name=__name__)
 
 
 def get_key(method_frame: frame.Method):
