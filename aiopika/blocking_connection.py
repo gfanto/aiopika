@@ -35,7 +35,7 @@ class BlockingChannel(channel.Channel):
         self.__consume_waiter = None
 
     async def _cancel_all_consumers(self):
-        LOGGER.debug('Cancelling %i consumers', len(self._consumers))
+        LOGGER.debug(f'Cancelling {len(self._consumers)} consumers')
 
         await asyncio.gather(
             *(self.basic_cancel(consumer_tag)
