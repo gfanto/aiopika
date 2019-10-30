@@ -1,5 +1,6 @@
 import logging
 import traceback
+import aiologger
 import asyncio
 
 from typing import Iterable, Coroutine
@@ -18,7 +19,7 @@ from .connection import ConnectionState
 __all__ = ['BlockingConnection', 'BlockingChannel', 'create_connection']
 
 
-LOGGER = logging.Logger(__name__)
+LOGGER = aiologger.Logger.with_default_handlers(name=__name__)
 
 
 class BlockingChannel(channel.Channel):
@@ -36,7 +37,7 @@ class BlockingChannel(channel.Channel):
         self.__consume_waiter = None
 
     async def _cancel_all_consumers(self):
-        LOGGER.debug('Cancelling %i consumers', len(self._consumers))
+        LOGGER.debug(f'Cancelling {len(self._consumers)} consumers')
 
         await asyncio.gather(
             *(self.basic_cancel(consumer_tag)
