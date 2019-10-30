@@ -357,9 +357,9 @@ class Connection(EventDispatcherObject):
                 if self._heartbeat_checker is not None:
                     self._heartbeat_checker.received()
                 else:
-                    LOGGER.warning('Received heartbeat frame without a heartbeat '
-                                   'checker')
-
+                    LOGGER.warning(
+                        'Received heartbeat frame without a heartbeat checker'
+                    )
             else:
                 channel_number = frame_value.channel_number
                 if channel_number > 0:
@@ -584,7 +584,9 @@ class Connection(EventDispatcherObject):
             LOGGER.debug(
                 f'Creating a HeartbeatChecker: {self.params.heartbeat}'
             )
-            return HeartbeatChecker(self, self.params.heartbeat)
+            hbc = HeartbeatChecker(self, self.params.heartbeat)
+            hbc.start()
+            return hbc
         return None
 
     @staticmethod
@@ -607,7 +609,9 @@ class Connection(EventDispatcherObject):
         self.params.channel_max = Connection._negotiate_integer_value(
             self.params.channel_max, method_frame.method.channel_max)
         self.params.frame_max = Connection._negotiate_integer_value(
-            self.params.frame_max, method_frame.method.frame_max)
+            self.params.frame_max,
+            method_frame.method.frame_max
+        )
 
         if callable(self.params.heartbeat):
             ret_heartbeat = self.params.heartbeat(

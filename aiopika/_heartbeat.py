@@ -35,8 +35,6 @@ class HeartbeatChecker:
 
         # self._heartbeat_received = asyncio.Event()
 
-        self.start()# lo tolgo quando lo metto nell'init della connection al posto del None
-
     @property
     def bytes_received_on_connection(self):
         return self._connection.bytes_received
