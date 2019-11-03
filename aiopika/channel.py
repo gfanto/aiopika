@@ -178,10 +178,17 @@ class Channel(EventDispatcherObject):
             return
 
         if consumer_tag not in self._consumers:
-            LOGGER.warning(f'basic_cancel - consumer not found: {consumer_tag}')
+            LOGGER.warning(
+                'basic_cancel - consumer not found: %s',
+                consumer_tag
+            )
             return
 
-        LOGGER.debug(f'Cancelling consumer: {consumer_tag} (nowait={nowait})')
+        LOGGER.debug(
+            'Cancelling consumer: %s (nowait=%s)',
+            consumer_tag,
+            nowait
+        )
 
         if nowait:
             del self._consumers[consumer_tag]
@@ -326,10 +333,10 @@ class Channel(EventDispatcherObject):
         await self._on_basic_ack(method_frame)
 
     async def _on_basic_qosok(self, method_frame: frame.Method):
-        LOGGER.debug(f'Basic.QosOk Received: {method_frame}')
+        LOGGER.debug('Basic.QosOk Received: %s', method_frame)
 
     async def _on_basic_consumeok(self, method_frame: frame.Method):
-        LOGGER.debug(f'Basic.ConsumeOk Received: {method_frame}')
+        LOGGER.debug('Basic.ConsumeOk Received: %s', method_frame)
 
     async def _on_basic_cancel(self, method_frame:  frame.Method):
         if method_frame.method.consumer_tag in self._cancelled:
@@ -340,10 +347,10 @@ class Channel(EventDispatcherObject):
         self._cleanup_consumer_ref(method_frame.method.consumer_tag)
 
     async def _on_basic_recoverok(self, method_frame: frame.Method):
-        LOGGER.debug(f'Basic.RecoverOk Received: {method_frame}')
+        LOGGER.debug('Basic.RecoverOk Received: %s', method_frame)
 
     async def _on_basic_getempty(self, method_frame: frame.Method):
-        LOGGER.debug(f'Received Basic.GetEmpty: {method_frame}')
+        LOGGER.debug('Received Basic.GetEmpty: %s', method_frame)
         self.__getok_callback = None
 
     #@has_content
@@ -370,7 +377,7 @@ class Channel(EventDispatcherObject):
             return
 
         if consumer_tag not in self._consumers:
-            LOGGER.error(f'Unexpected delivery: {method_frame}')
+            LOGGER.error('Unexpected delivery: %s', method_frame)
             return
 
         await self._dispatch_consumer(
@@ -424,7 +431,7 @@ class Channel(EventDispatcherObject):
         )
 
     async def _on_confirm_selectok(self, method_frame):
-        LOGGER.debug(f'Confirm.SelectOk Received: {method_frame}')
+        LOGGER.debug('Confirm.SelectOk Received: %s', method_frame)
 
     @property
     def consumer_tags(self):
@@ -533,16 +540,16 @@ class Channel(EventDispatcherObject):
         )
 
     async def _on_exchange_bindok(self,  method_frame):
-        LOGGER.debug(f'Exchange.BindOk Received: {method_frame}')
+        LOGGER.debug('Exchange.BindOk Received: %s', method_frame)
 
     async def _on_exchange_unbindok(self, method_frame):
-        LOGGER.debug(f'Exchange.UnbindOk Received: {method_frame}')
+        LOGGER.debug('Exchange.UnbindOk Received: %s', method_frame)
 
     async def _on_exchange_declareok(self, method_frame):
-        LOGGER.debug(f'Exchange.DeclareOk Received: {method_frame}')
+        LOGGER.debug('Exchange.DeclareOk Received: %s', method_frame)
 
     async def _on_exchange_deleteok(self, method_frame):
-        LOGGER.debug(f'Exchange.DeleteOk Received: {method_frame}')
+        LOGGER.debug('Exchange.DeleteOk Received: %s', method_frame)
 
     @property
     def is_closed(self):
@@ -579,7 +586,12 @@ class Channel(EventDispatcherObject):
     ):
         self._raise_if_not_open()
 
-        LOGGER.info(f'Closing channel ({reply_code}): {reply_text} on {self}')
+        LOGGER.info(
+            'Closing channel (%s): %s on %s',
+            reply_code,
+            reply_text,
+            self
+        )
         self._closing_reason = exceptions.ChannelClosedByClient(
             reply_code,
             reply_text
@@ -687,19 +699,19 @@ class Channel(EventDispatcherObject):
         )
 
     async def _on_queue_declareok(self, method_frame):
-        LOGGER.debug(f'Queue.DeclareOk Received: {method_frame}')
+        LOGGER.debug('Queue.DeclareOk Received: %s', method_frame)
 
     async def _on_queue_bindok(self, method_frame):
-        LOGGER.debug(f'Queue.BindOk Received: {method_frame}')
+        LOGGER.debug('Queue.BindOk Received: %s', method_frame)
 
     async def _on_queue_unbindok(self, method_frame):
-        LOGGER.debug(f'Queue.UnbindOk Received: {method_frame}')
+        LOGGER.debug('Queue.UnbindOk Received: %s', method_frame)
 
     async def _on_queue_purgeok(self, method_frame):
-        LOGGER.debug(f'Queue.PurgeOk Received: {method_frame}')
+        LOGGER.debug('Queue.PurgeOk Received: %s', method_frame)
 
     async def _on_queue_deleteok(self, method_frame):
-        LOGGER.debug(f'Queue.DeleteOk Received: {method_frame}')
+        LOGGER.debug('Queue.DeleteOk Received: %s', method_frame)
 
     async def tx_commit(self, callback: Callable = None):#ma un po di nowait qui??
         self._validate_coroutine(callback)
@@ -717,13 +729,13 @@ class Channel(EventDispatcherObject):
         await self._rpc(spec.Tx.Select(), [spec.Tx.SelectOk], callback)
 
     async def _on_tx_selectok(self, method_frame: frame.Method):
-        LOGGER.debug(f'Tx.SelectOk Received: {method_frame}')
+        LOGGER.debug('Tx.SelectOk Received: %s', method_frame)
 
     async def _on_tx_rollbackok(self, method_frame: frame.Method):
-        LOGGER.debug(f'Tx.RollbackOk Received: {method_frame}')
+        LOGGER.debug('Tx.RollbackOk Received: %s', method_frame)
 
     async def _on_tx_commitok(self, method_frame: frame.Method):
-        LOGGER.debug(f'Tx.CommitOk Received: {method_frame}')
+        LOGGER.debug('Tx.CommitOk Received: %s', method_frame)
 
     def _cleanup(self):
         self.connection._channel_cleanup(self)
@@ -744,8 +756,11 @@ class Channel(EventDispatcherObject):
     async def _on_channel_close(self, method_frame):
         reply_code = method_frame.method.reply_code
         reply_text = method_frame.method.reply_text
-        LOGGER.warning(f'Received remote Channel.Close ({reply_code}):'
-                       f' {reply_text} on {self}'
+        LOGGER.warning(
+            'Received remote Channel.Close (%s): %s on %s',
+            reply_code,
+            reply_text,
+            self
         )
         assert not self.is_closed
 
@@ -761,7 +776,7 @@ class Channel(EventDispatcherObject):
             )
 
     def _close_meta(self, reason: BaseException):
-        LOGGER.debug(f'Handling meta-close on {self}: {reason}')
+        LOGGER.debug('Handling meta-close on %s: %s', self, reason)
 
         if not self.is_closed:
             self._closing_reason = reason
@@ -769,7 +784,7 @@ class Channel(EventDispatcherObject):
                 self._transition_to_closed()
 
     async def _on_channel_closeok(self, method_frame: frame.Method):
-        LOGGER.info(f'Received {method_frame.method} on {self}')
+        LOGGER.info('Received %s on %s', method_frame.method, self)
         self._transition_to_closed()
 
     async def _on_channel_flow(self, _method_frame_unused: frame.Method):
@@ -789,11 +804,11 @@ class Channel(EventDispatcherObject):
 
     async def _on_channel_openok(self, method_frame: frame.Method):
         if self.is_closing:
-            LOGGER.debug(f'Suppressing while in closing state: {method_frame}')
+            LOGGER.debug('Suppressing while in closing state: %s', method_frame)
         elif self.is_open:
-            LOGGER.debug(f'Got open-ok while already open: {method_frame}')
+            LOGGER.debug('Got open-ok while already open: %s', method_frame)
         else:
-            LOGGER.info(f'Channel open: {self}')
+            LOGGER.info('Channel open: %s', self)
             self._set_channel_state(self.ChannelState.OPEN)
 
     async def _dispatch_consumer(
@@ -844,7 +859,7 @@ class Channel(EventDispatcherObject):
                     *self._content_assembler.assemble()
                 )
         else:
-            LOGGER.error(f'Unexpected frame: {frame_value}')
+            LOGGER.error('Unexpected frame: %s', frame_value)
             raise exceptions.UnexpectedFrameError(frame_value)
 
         if self.__frame_waiter is not None:
@@ -909,6 +924,6 @@ class Channel(EventDispatcherObject):
         await self.connection._send_method(self.channel_number, method, content)
 
     def _set_channel_state(self, state):
-        LOGGER.debug(f'New channel state: {state} (prev={self._state})')
+        LOGGER.debug('New channel state: %s (prev=%s)', state, self._state)
         self._state = state
 

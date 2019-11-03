@@ -20,8 +20,11 @@ class HeartbeatChecker:
         self._check_interval = timeout + 5
 
         LOGGER.debug(
-            f'timeout: {self._timeout} send_interval: {self._send_interval} '
-            f'check_interval: {self._check_interval}'
+            'timeout: %s send_interval: %s '
+            'check_interval: %s',
+            self._timeout,
+            self._send_interval,
+            self._check_interval
         )
 
         self._bytes_received = 0
@@ -80,9 +83,10 @@ class HeartbeatChecker:
                 self._idle_byte_intervals += 1
 
             LOGGER.debug(
-                f'Received {self._heartbeat_frames_received} heartbeat frames, '
-                f'sent {self._heartbeat_frames_sent}, '
-                f'idle intervals {self._idle_byte_intervals}'
+                'Received %s heartbeat frames, sent %s, idle intervals %s',
+                self._heartbeat_frames_received,
+                self._heartbeat_frames_sent,
+                self._idle_byte_intervals
             )
 
             if self.connection_is_idle:
@@ -113,8 +117,8 @@ class HeartbeatChecker:
 
     def _close_connection(self):
         LOGGER.info(
-            f'Connection is idle, '
-            f'{self._idle_byte_intervals} stale byte intervals',
+            'Connection is idle, %s stale byte intervals',
+            self._idle_byte_intervals
         )
 
         self._connection.terminate(

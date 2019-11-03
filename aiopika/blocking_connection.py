@@ -37,7 +37,7 @@ class BlockingChannel(channel.Channel):
         self.__consume_waiter = None
 
     async def _cancel_all_consumers(self):
-        LOGGER.debug(f'Cancelling {len(self._consumers)} consumers')
+        LOGGER.debug(f'Cancelling %s consumers', len(self._consumers))
 
         await asyncio.gather(
             *(self.basic_cancel(consumer_tag)
@@ -106,19 +106,19 @@ class BlockingChannel(channel.Channel):
         )
 
     def _handle_consumer_ex(self, ex):
-        LOGGER.warning(f'During consumer dispatch an exception occourred: {ex}')
+        LOGGER.warning('During consumer dispatch an exception occourred: %s', ex)
         LOGGER.debug(traceback.print_tb(ex.__traceback__))
 
     def _handle_callback_ex(self, ex):
-        LOGGER.warning(f'During callback dispatch an exception occourred: {ex}')
+        LOGGER.warning('During callback dispatch an exception occourred: %s', ex)
         LOGGER.debug(traceback.print_tb(ex.__traceback__))
 
     def _handle_frame_ex(self, ex):
-        LOGGER.warning(f'During frame dispatch an exception occourred: {ex}')
+        LOGGER.warning('During frame dispatch an exception occourred: %s', ex)
         LOGGER.debug(traceback.print_tb(ex.__traceback__))
 
     def _handle_method_ex(self, ex):
-        LOGGER.warning(f'During method dispatch an exception occourred: {ex}')
+        LOGGER.warning('During method dispatch an exception occourred: %s', ex)
         LOGGER.debug(traceback.print_tb(ex.__traceback__))
 
     async def __aenter__(self):
@@ -136,7 +136,7 @@ class BlockingConnection(connection.Connection):
         self.__process_frame_loop = None
 
     def _create_channel(self, channel_number: int):
-        LOGGER.debug(f'Creating channel {channel_number}')
+        LOGGER.debug('Creating channel %s', channel_number)
         return BlockingChannel(self, channel_number)
 
     async def connect(self):
@@ -198,11 +198,11 @@ class BlockingConnection(connection.Connection):
         )
 
     def _handle_frame_ex(self, ex):
-        LOGGER.warning(f'During frame dispatch an exception occourred: {ex}')
+        LOGGER.warning('During frame dispatch an exception occourred: %s', ex)
         LOGGER.debug(traceback.print_tb(ex.__traceback__))
 
     def _handle_deliver_ex(self, ex):
-        LOGGER.warning(f'During deliver dispatch an exception occourred: {ex}')
+        LOGGER.warning('During deliver dispatch an exception occourred: %s', ex)
         LOGGER.debug(traceback.print_tb(ex.__traceback__))
 
     async def __aenter__(self):

@@ -85,7 +85,7 @@ class EventDispatcherObject:
         for attr in dir(self):
             if attr.startswith(self.EVENT_PREFIX) and \
                 attr not in self._method_to_callback_name.values():
-                LOGGER.warning(f'{attr} starts with event prefix')
+                LOGGER.warning('%s starts with event prefix', attr)
 
     def __init__(self):
         self.__dispatcher = dict()

@@ -109,7 +109,7 @@ class Connection(EventDispatcherObject):
         self._set_connection_state(ConnectionState.INIT)
 
     def _set_connection_state(self, state: ConnectionState) -> None:
-        LOGGER.debug(f'New Connection state: {state} (prev={self._state})')
+        LOGGER.debug('New Connection state: %s (prev=%s)', state, self._state)
         self._state = state
         if self.__state_waiter is not None:
             self.__state_waiter.check(state)
@@ -235,7 +235,7 @@ class Connection(EventDispatcherObject):
             )
 
         if error:
-            LOGGER.error(f'Stream terminated in unexpected fashion: {error}')
+            LOGGER.error('Stream terminated in unexpected fashion: %s', error)
         self._remove_heartbeat()
         self._stream.terminate()
         self._set_connection_state(ConnectionState.CLOSED)
@@ -336,7 +336,10 @@ class Connection(EventDispatcherObject):
         if not channel_number in self._channels:
             LOGGER.critical(
                 'Received %s frame for unregistered channel %i on %s',
-                frame_value.NAME, frame_value.channel_number, self)
+                frame_value.NAME,
+                frame_value.channel_number,
+                self
+            )
             return
         await self._channels[channel_number]._handle_frame(frame_value)
 
@@ -369,14 +372,19 @@ class Connection(EventDispatcherObject):
                         try:
                             await self._dispatch_frame(frame_value)
                         except exceptions.UnexpectedFrameError:
-                            LOGGER.debug(f'unable to dispatch frame: {frame_value}')
+                            LOGGER.debug(
+                                'unable to dispatch frame: %s',
+                                frame_value
+                            )
                     else:
                         LOGGER.info(
-                            f'Connection received non method frame: {frame_value}'
+                            'Connection received non method frame: %s',
+                            frame_value
                         )
                 else:
                     LOGGER.info(
-                        f'Discarding frame: {frame_value} cause channel number < 0'
+                        'Discarding frame: %s cause channel number < 0',
+                        frame_value
                     )
 
     async def run_until_closed(self):
@@ -413,7 +421,7 @@ class Connection(EventDispatcherObject):
         return len(self._channels) + 1
 
     def _create_channel(self, channel_number: int) -> channel.Channel:
-        LOGGER.debug(f'Creating channel {channel_number}')
+        LOGGER.debug('Creating channel %s', channel_number)
         return Channel(self, channel_number)
 
     async def channel(self, channel_number: int = -1):
@@ -436,7 +444,7 @@ class Connection(EventDispatcherObject):
 
     def _channel_cleanup(self, ch: Channel):
         del self._channels[ch.channel_number]
-        LOGGER.debug(f'Removed channel {ch.channel_number}')
+        LOGGER.debug('Removed channel %s', ch.channel_number)
 
     async def _close_channel(self, ch: Channel, reply_code: int, reply_text: str):
         try:
@@ -480,7 +488,7 @@ class Connection(EventDispatcherObject):
             raise error
 
         self._set_connection_state(ConnectionState.CLOSING)
-        LOGGER.info(f'Closing connection ({reply_code}): {reply_text}')
+        LOGGER.info('Closing connection (%s): %s', reply_code, reply_text)
 
         if self._channels:
             await self._close_channels(reply_code, reply_text)
@@ -649,11 +657,14 @@ class Connection(EventDispatcherObject):
         )
 
     async def _on_connection_closeok(self, method_frame):
-        LOGGER.debug(f'_on_connection_closeok: frame={method_frame}')
+        LOGGER.debug('_on_connection_closeok: frame=%s', method_frame)
         self._set_connection_state(ConnectionState.CLOSED)
 
     async def _on_connection_close(self, method_frame):
-        LOGGER.debug(f'_on_connection_close_from_broker: frame={method_frame}')
+        LOGGER.debug(
+            '_on_connection_close_from_broker: frame=%s',
+            method_frame
+        )
 
         error = exceptions.ConnectionClosedByBroker(
             method_frame.method.reply_code,
@@ -662,11 +673,12 @@ class Connection(EventDispatcherObject):
         self.terminate(error)
 
     async def _on_connection_blocked(self, method_frame):
-        LOGGER.warning(f'Received {method_frame} from broker')
+        LOGGER.warning('Received %s from broker', method_frame)
 
         if self._blocked_conn_waiter.is_waiting:
             LOGGER.warning(
-                f'connection is already blocked, {method_frame} received'
+                'connection is already blocked, %s received',
+                method_frame
             )
             return
 
@@ -684,7 +696,7 @@ class Connection(EventDispatcherObject):
             raise exceptions.ConnectionBlockedTimeout from e
 
     async def _on_connection_unblocked(self, method_frame):
-        LOGGER.info(f'Received {method_frame} from broker')
+        LOGGER.info('Received %s from broker', method_frame)
 
         if not self._blocked_conn_waiter.is_waiting:
             LOGGER.warning(
