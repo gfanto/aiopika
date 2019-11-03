@@ -13,7 +13,6 @@ from . import channel
 from . import frame
 
 from ._dispatch import Waiter
-from .connection import ConnectionState
 
 
 __all__ = ['BlockingConnection', 'BlockingChannel', 'create_connection']
@@ -156,10 +155,9 @@ class BlockingConnection(connection.Connection):
         await self.disconnect()
 
     def start_loop(self):
-        if not self._state == ConnectionState.PROTOCOL or \
-            self._state == ConnectionState.OPENING:
+        if not self.is_opening:
             raise exceptions.ConnectionWrongStateError(
-                'Start loop require an opened connection'
+                'Start loop require an already connected connection'
             )
         if self.__process_frame_loop is not None:
             raise RuntimeError('Process loop is already started')
