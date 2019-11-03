@@ -1,6 +1,6 @@
 import logging
 import traceback
-import aiologger
+import logging
 import asyncio
 
 from typing import Iterable, Coroutine
@@ -19,7 +19,7 @@ from .connection import ConnectionState
 __all__ = ['BlockingConnection', 'BlockingChannel', 'create_connection']
 
 
-LOGGER = aiologger.Logger.with_default_handlers(name=__name__)
+LOGGER = logging.getLogger(__name__)
 
 
 class BlockingChannel(channel.Channel):

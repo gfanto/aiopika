@@ -1,5 +1,5 @@
 import functools
-import aiologger
+import logging
 import asyncio
 import typing
 import copy
@@ -37,7 +37,7 @@ from .channel import Channel
 
 __all__ = ['Connection']
 
-LOGGER = aiologger.Logger.with_default_handlers(name=__name__)
+LOGGER = logging.getLogger(__name__)
 
 
 class _RWStream:

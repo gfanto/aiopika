@@ -1,5 +1,5 @@
 import collections
-import aiologger
+import logging
 import uuid
 import enum
 import asyncio
@@ -34,7 +34,7 @@ from ._dispatch import EventDispatcherObject, Waiter
 __all__ = ['Channel']
 
 
-LOGGER = aiologger.Logger.with_default_handlers(name=__name__)
+LOGGER = logging.getLogger(__name__)
 
 
 class _ContentFrameAssembler(object):

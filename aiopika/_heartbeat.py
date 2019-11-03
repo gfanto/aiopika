@@ -1,11 +1,11 @@
 import asyncio
-import aiologger
+import logging
 
 from . import exceptions
 from ._frame import Heartbeat
 
 
-LOGGER = aiologger.Logger.with_default_handlers(name=__name__)
+LOGGER = logging.getLogger(__name__)
 
 
 class HeartbeatChecker:
