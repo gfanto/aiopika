@@ -5,6 +5,7 @@ import asyncio
 
 from typing import Iterable, Coroutine
 from io import StringIO
+from functools import partial
 
 from . import exceptions
 from . import connection
@@ -16,7 +17,12 @@ from . import frame
 from ._dispatch import Waiter
 
 
-__all__ = ['BlockingConnection', 'BlockingChannel', 'create_connection']
+__all__ = [
+    'BlockingConnection',
+    'BlockingChannel',
+    'AsyncChannel',
+    'AsyncConnection'
+]
 
 
 LOGGER = logging.getLogger(__name__)
@@ -36,47 +42,7 @@ def _create_task(coro, exception_handler):
     return t
 
 
-class BlockingChannel(channel.Channel):
-    def __init__(self, connection, channel_number: int):
-        super().__init__(connection, channel_number)
-        self.__consume_waiter = None
-
-    async def start_consuming(self):
-        if self.__consume_waiter is not None:
-            raise RuntimeError(
-                f'Channel {self.channel_number} is already consuming'
-            )
-        self.__consume_waiter = Waiter()
-        await self.__consume_waiter.wait()
-        self.__consume_waiter = None
-
-    async def _cancel_all_consumers(self):
-        LOGGER.debug(f'Cancelling %s consumers', len(self._consumers))
-
-        await asyncio.gather(
-            *(self.basic_cancel(consumer_tag)
-                for consumer_tag in self._consumers
-            )
-        )
-
-    async def stop_consuming(self, consumer_tag=None):
-        try:
-            if consumer_tag:
-                await self.basic_cancel(consumer_tag)
-            else:
-                await self._cancel_all_consumers()
-        finally:
-            self.terminate_consuming()
-
-    def terminate_consuming(self):
-        if self.__consume_waiter is not None:
-            self.__consume_waiter.check()
-            self.__consume_waiter =  None
-
-    def _transition_to_closed(self):
-        self.terminate_consuming()
-        super()._transition_to_closed()
-
+class AsyncChannel(channel.Channel):
     async def _dispatch_consumer(
         self,
         consumer_tag,
@@ -91,7 +57,7 @@ class BlockingChannel(channel.Channel):
                 header_frame,
                 body
             ),
-            self._handle_consumer_ex
+            partial(self._handle_consumer_ex, consumer_tag)
         )
 
     # @[OPT] toggle comment this enable/disable the task creation of rpc callbacks
@@ -117,14 +83,21 @@ class BlockingChannel(channel.Channel):
             self._handle_method_ex
         )
 
-    def _handle_consumer_ex(self, fut, ex):
-        LOGGER.warning('During consumer dispatch an exception occourred: %s', ex)
+    def _handle_consumer_ex(self, consumer_tag, fut, ex):
+        LOGGER.warning(
+            'During consumer (%s) dispatch an exception occourred: %s',
+            consumer_tag,
+            ex
+        )
         traceback_buf = StringIO()
         fut.print_stack(file=traceback_buf)
         LOGGER.debug(traceback_buf.getvalue())
 
     def _handle_callback_ex(self, fut, ex):
-        LOGGER.warning('During callback dispatch an exception occourred: %s', ex)
+        LOGGER.warning(
+            'During callback dispatch an exception occourred: %s',
+            ex
+        )
         traceback_buf = StringIO()
         fut.print_stack(file=traceback_buf)
         LOGGER.debug(traceback_buf.getvalue())
@@ -150,14 +123,14 @@ class BlockingChannel(channel.Channel):
         await self.close()
 
 
-class BlockingConnection(connection.Connection):
+class AsyncConnection(connection.Connection):
     def __init__(self, parameters: Parameters = None):
         super().__init__(parameters)
         self.__process_frame_loop = None
 
     def _create_channel(self, channel_number: int):
         LOGGER.debug('Creating channel %s', channel_number)
-        return BlockingChannel(self, channel_number)
+        return AsyncChannel(self, channel_number)
 
     async def connect(self):
         await super().connect()
@@ -202,7 +175,7 @@ class BlockingConnection(connection.Connection):
     async def _deliver_frame_to_channel(self, frame_value):
         return _create_task(
             super()._deliver_frame_to_channel(frame_value),
-            self._handle_deliver_ex
+            partial(self._handle_deliver_ex, frame_value.channel_number)
         )
 
     def _handle_frame_ex(self, fut, ex):
@@ -211,8 +184,12 @@ class BlockingConnection(connection.Connection):
         fut.print_stack(file=traceback_buf)
         LOGGER.debug(traceback_buf.getvalue())
 
-    def _handle_deliver_ex(self, fut, ex):
-        LOGGER.warning('During deliver dispatch an exception occourred: %s', ex)
+    def _handle_deliver_ex(self, channel, fut, ex):
+        LOGGER.warning(
+            'During deliver dispatch (channel: %s) an exception occourred: %s',
+            channel,
+            ex
+        )
         traceback_buf = StringIO()
         fut.print_stack(file=traceback_buf)
         LOGGER.debug(traceback_buf.getvalue())
@@ -226,8 +203,50 @@ class BlockingConnection(connection.Connection):
         await self.close()
 
 
-async def create_connection(params: Parameters = None):
-    conn = BlockingConnection(params)
-    await conn.open()
-    return conn
+class BlockingChannel(AsyncChannel):
+    def __init__(self, connection, channel_number: int):
+        super().__init__(connection, channel_number)
+        self.__consume_waiter = None
+
+    async def start_consuming(self):
+        if self.__consume_waiter is not None:
+            raise RuntimeError(
+                f'Channel {self.channel_number} is already consuming'
+            )
+        self.__consume_waiter = Waiter()
+        await self.__consume_waiter.wait()
+        self.__consume_waiter = None
+
+    async def _cancel_all_consumers(self):
+        LOGGER.debug(f'Cancelling %s consumers', len(self._consumers))
+
+        await asyncio.gather(
+            *(self.basic_cancel(consumer_tag)
+                for consumer_tag in self._consumers
+            )
+        )
+
+    async def stop_consuming(self, consumer_tag=None):
+        try:
+            if consumer_tag:
+                await self.basic_cancel(consumer_tag)
+            else:
+                await self._cancel_all_consumers()
+        finally:
+            self.terminate_consuming()
+
+    def terminate_consuming(self):
+        if self.__consume_waiter is not None:
+            self.__consume_waiter.check()
+            self.__consume_waiter =  None
+
+    def _transition_to_closed(self):
+        self.terminate_consuming()
+        super()._transition_to_closed()
+
+
+class BlockingConnection(AsyncConnection):
+    def _create_channel(self, channel_number: int):
+        LOGGER.debug('Creating channel %s', channel_number)
+        return BlockingChannel(self, channel_number)
 
