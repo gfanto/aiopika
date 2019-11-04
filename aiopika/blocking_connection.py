@@ -4,6 +4,7 @@ import logging
 import asyncio
 
 from typing import Iterable, Coroutine
+from io import StringIO
 
 from . import exceptions
 from . import connection
@@ -19,6 +20,20 @@ __all__ = ['BlockingConnection', 'BlockingChannel', 'create_connection']
 
 
 LOGGER = logging.getLogger(__name__)
+
+
+def _create_task(coro, exception_handler):
+    def _result_handler(f):
+        try:
+            f.result()
+        except asyncio.CancelledError:
+            pass
+        except BaseException as ex:
+            exception_handler(f, f.exception())
+
+    t = asyncio.create_task(coro)
+    t.add_done_callback(_result_handler)
+    return t
 
 
 class BlockingChannel(channel.Channel):
@@ -70,7 +85,7 @@ class BlockingChannel(channel.Channel):
         header_frame,
         body
     ):
-        return self.connection._create_task(
+        return _create_task(
             super()._dispatch_consumer(
                 on_message_callback,
                 channel,
@@ -83,19 +98,19 @@ class BlockingChannel(channel.Channel):
 
     # @[OPT] toggle comment this enable/disable the task creation of rpc callbacks
     async def _dispatch_callback(self, callback, *args, **kwargs):
-        return self.connection._create_task(
+        return _create_task(
             super()._dispatch_callback(callback, *args, **kwargs),
             self._handle_callback_ex
         )
 
     async def _dispatch_frame(self, frame_value):
-        return self.connection._create_task(
+        return _create_task(
             super()._dispatch_frame(frame_value),
             self._handle_frame_ex
         )
 
     async def _dispatch_method(self, method_frame, header_frame, body):
-        return self.connection._create_task(
+        return _create_task(
             super()._dispatch_method(
                 method_frame,
                 header_frame,
@@ -104,21 +119,29 @@ class BlockingChannel(channel.Channel):
             self._handle_method_ex
         )
 
-    def _handle_consumer_ex(self, ex):
+    def _handle_consumer_ex(self, fut, ex):
         LOGGER.warning('During consumer dispatch an exception occourred: %s', ex)
-        LOGGER.debug(traceback.print_tb(ex.__traceback__))
+        traceback_buf = StringIO()
+        fut.print_stack(file=traceback_buf)
+        LOGGER.debug(traceback_buf.getvalue())
 
-    def _handle_callback_ex(self, ex):
+    def _handle_callback_ex(self, fut, ex):
         LOGGER.warning('During callback dispatch an exception occourred: %s', ex)
-        LOGGER.debug(traceback.print_tb(ex.__traceback__))
+        traceback_buf = StringIO()
+        fut.print_stack(file=traceback_buf)
+        LOGGER.debug(traceback_buf.getvalue())
 
-    def _handle_frame_ex(self, ex):
+    def _handle_frame_ex(self, fut, ex):
         LOGGER.warning('During frame dispatch an exception occourred: %s', ex)
-        LOGGER.debug(traceback.print_tb(ex.__traceback__))
+        traceback_buf = StringIO()
+        fut.print_stack(file=traceback_buf)
+        LOGGER.debug(traceback_buf.getvalue())
 
-    def _handle_method_ex(self, ex):
+    def _handle_method_ex(self, fut, ex):
         LOGGER.warning('During method dispatch an exception occourred: %s', ex)
-        LOGGER.debug(traceback.print_tb(ex.__traceback__))
+        traceback_buf = StringIO()
+        fut.print_stack(file=traceback_buf)
+        LOGGER.debug(traceback_buf.getvalue())
 
     async def __aenter__(self):
         if self.is_closed:
@@ -172,36 +195,29 @@ class BlockingConnection(connection.Connection):
             self.__process_frame_loop.result()
         self.__process_frame_loop = None
 
-    def _create_task(self, coro, exception_handler):
-        def _result_handler(f):
-            try:
-                f.result()
-            except BaseException as ex:
-                exception_handler(ex)
-
-        t = asyncio.create_task(coro)
-        t.add_done_callback(_result_handler)
-        return t
-
     async def _dispatch_frame(self, frame_value: frame.Frame):
-        return self._create_task(
+        return _create_task(
             super()._dispatch_frame(frame_value),
             self._handle_frame_ex
         )
 
     async def _deliver_frame_to_channel(self, frame_value):
-        return self._create_task(
+        return _create_task(
             super()._deliver_frame_to_channel(frame_value),
             self._handle_deliver_ex
         )
 
-    def _handle_frame_ex(self, ex):
+    def _handle_frame_ex(self, fut, ex):
         LOGGER.warning('During frame dispatch an exception occourred: %s', ex)
-        LOGGER.debug(traceback.print_tb(ex.__traceback__))
+        traceback_buf = StringIO()
+        fut.print_stack(file=traceback_buf)
+        LOGGER.debug(traceback_buf.getvalue())
 
-    def _handle_deliver_ex(self, ex):
+    def _handle_deliver_ex(self, fut, ex):
         LOGGER.warning('During deliver dispatch an exception occourred: %s', ex)
-        LOGGER.debug(traceback.print_tb(ex.__traceback__))
+        traceback_buf = StringIO()
+        fut.print_stack(file=traceback_buf)
+        LOGGER.debug(traceback_buf.getvalue())
 
     async def __aenter__(self):
         if self.is_closed:
