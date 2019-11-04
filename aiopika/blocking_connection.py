@@ -79,16 +79,14 @@ class BlockingChannel(channel.Channel):
 
     async def _dispatch_consumer(
         self,
-        on_message_callback,
-        channel,
+        consumer_tag,
         method_frame,
         header_frame,
         body
     ):
         return _create_task(
             super()._dispatch_consumer(
-                on_message_callback,
-                channel,
+                consumer_tag,
                 method_frame,
                 header_frame,
                 body

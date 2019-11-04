@@ -381,8 +381,7 @@ class Channel(EventDispatcherObject):
             return
 
         await self._dispatch_consumer(
-            self._consumers[consumer_tag],
-            self,
+            consumer_tag,
             method_frame.method,
             header_frame.properties,
             body
@@ -811,30 +810,29 @@ class Channel(EventDispatcherObject):
             LOGGER.info('Channel open: %s', self)
             self._set_channel_state(self.ChannelState.OPEN)
 
-    async def _dispatch_consumer(
+    def _dispatch_consumer(
         self,
-        on_message_callback,
-        channel,
+        consumer_tag,
         method_frame,
         header_frame,
         body
     ):
-        return await on_message_callback(
-            channel,
+        return self._consumers[consumer_tag](
+            self,
             method_frame,
             header_frame,
             body
         )
 
-    async def _dispatch_callback(self, callback, *args, **kwargs):
+    def _dispatch_callback(self, callback, *args, **kwargs):
         assert iscoroutinefunction(callback)
-        return await callback(*args, **kwargs)
+        return callback(*args, **kwargs)
 
-    async def _dispatch_frame(self, frame_value: frame.Frame):
-        return await self._dispatch_event(frame_value)(frame_value)
+    def _dispatch_frame(self, frame_value: frame.Frame):
+        return self._dispatch_event(frame_value)(frame_value)
 
-    async def _dispatch_method(self, method_frame, header_frame, body):
-        return await self._dispatch_event(method_frame)(
+    def _dispatch_method(self, method_frame, header_frame, body):
+        return self._dispatch_event(method_frame)(
             method_frame,
             header_frame,
             body
