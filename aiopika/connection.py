@@ -437,7 +437,8 @@ class Connection(EventDispatcherObject):
 
         try:
             await ch.open()
-            return weakref.ref(ch)()
+            return ch
+            #return weakref.ref(ch)()
         except:
             del self._channels[channel_number]
             raise
