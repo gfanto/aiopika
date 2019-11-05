@@ -249,3 +249,8 @@ class BlockingConnection(AsyncConnection):
         LOGGER.debug('Creating channel %s', channel_number)
         return BlockingChannel(self, channel_number)
 
+    async def channel(self, channel_number: int = -1):
+        ch = super().channel(channel_number)
+        await ch.open()
+        return ch
+

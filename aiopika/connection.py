@@ -6,7 +6,6 @@ import copy
 import platform
 import math
 import enum
-import weakref
 
 from typing import (
     Callable,
@@ -438,7 +437,7 @@ class Connection(EventDispatcherObject):
         LOGGER.debug('Creating channel %s', channel_number)
         return Channel(self, channel_number)
 
-    async def channel(self, channel_number: int = -1):
+    def channel(self, channel_number: int = -1):
         if not self.is_open:
             raise exceptions.ConnectionWrongStateError(
                 f'Channel allocation requires an open connection: {self}'
@@ -450,9 +449,7 @@ class Connection(EventDispatcherObject):
         self._channels[channel_number] = ch
 
         try:
-            await ch.open()
             return ch
-            #return weakref.ref(ch)()
         except:
             del self._channels[channel_number]
             raise
