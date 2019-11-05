@@ -94,6 +94,19 @@ class _ContentFrameAssembler(object):
         self._ready = False
 
 
+CLOSE = 1
+OPENING = 2
+OPEN = 3
+CLOSING = 4
+
+CHANNEL_STATE = {
+    CLOSE: 'CLOSE',
+    OPENING: 'OPENING',
+    OPEN: 'OPEN',
+    CLOSING: 'CLOSING',
+}
+
+
 class Channel(EventDispatcherObject):
     _cancelled: Set[str]
     _consumers: Dict[str, Callable]
@@ -107,13 +120,6 @@ class Channel(EventDispatcherObject):
     __getok_callback: Optional[Callable]
 
     __frame_waiter: Optional[Waiter]
-
-    @enum.unique
-    class ChannelState(enum.Enum):
-        CLOSE    = 'CLOSE'
-        OPENING  = 'OPENING'
-        OPEN     = 'OPEN'
-        CLOSING  = 'CLOSING'
 
     def __init__(self, connection, channel_number: int):
         super(Channel, self).__init__()
@@ -130,7 +136,7 @@ class Channel(EventDispatcherObject):
         self._cancelled = set()
         self._consumers = dict()
         self._consumers_with_noack = set()
-        self._state = self.ChannelState.CLOSE
+        self._state = CLOSE
         self._closing_reason = None
 
         self.__getok_callback = None
@@ -552,15 +558,15 @@ class Channel(EventDispatcherObject):
 
     @property
     def is_closed(self):
-        return self._state == self.ChannelState.CLOSE
+        return self._state == CLOSE
 
     @property
     def is_closing(self):
-        return self._state == self.ChannelState.CLOSING
+        return self._state == CLOSING
 
     @property
     def is_open(self):
-        return self._state == self.ChannelState.OPEN
+        return self._state == OPEN
 
     async def open(self):
         if not self.is_closed:
@@ -568,7 +574,7 @@ class Channel(EventDispatcherObject):
                 'Channel open was called but channel is not open'
             )
 
-        self._set_channel_state(self.ChannelState.OPENING)
+        self._set_channel_state(OPENING)
         await self._rpc(spec.Channel.Open(), [spec.Channel.OpenOk])
 
     async def _remove_consumers(self):
@@ -597,7 +603,7 @@ class Channel(EventDispatcherObject):
         )
 
         await self._remove_consumers()
-        self._set_channel_state(self.ChannelState.CLOSING)
+        self._set_channel_state(CLOSING)
 
         await self._rpc(
             spec.Channel.Close(reply_code, reply_text, 0, 0),
@@ -749,7 +755,7 @@ class Channel(EventDispatcherObject):
         assert not self.is_closed
         assert self._closing_reason is not None
 
-        self._set_channel_state(self.ChannelState.CLOSE)
+        self._set_channel_state(CLOSE)
         self._cleanup()
 
     async def _on_channel_close(self, method_frame):
@@ -808,7 +814,7 @@ class Channel(EventDispatcherObject):
             LOGGER.debug('Got open-ok while already open: %s', method_frame)
         else:
             LOGGER.info('Channel open: %s', self)
-            self._set_channel_state(self.ChannelState.OPEN)
+            self._set_channel_state(OPEN)
 
     def _dispatch_consumer(
         self,
@@ -898,15 +904,15 @@ class Channel(EventDispatcherObject):
                     await self._dispatch_callback(callback, *args, **kwargs)
 
     def _raise_if_not_open(self):
-        if self._state == self.ChannelState.OPEN:
+        if self._state == OPEN:
             return
-        if self._state == self.ChannelState.OPENING:
+        if self._state == OPENING:
             raise exceptions.ChannelWrongStateError(
                 'Channel is opening, but is not usable yet.')
-        elif self._state == self.ChannelState.CLOSING:
+        elif self._state == CLOSING:
             raise exceptions.ChannelWrongStateError('Channel is closing.')
         else:
-            assert self._state == self.ChannelState.CLOSE
+            assert self._state == CLOSE
             raise exceptions.ChannelWrongStateError('Channel is closed.')
 
     def _validate_coroutine(self, *args):
@@ -922,6 +928,10 @@ class Channel(EventDispatcherObject):
         await self.connection._send_method(self.channel_number, method, content)
 
     def _set_channel_state(self, state):
-        LOGGER.debug('New channel state: %s (prev=%s)', state, self._state)
+        LOGGER.debug(
+            'New channel state: %s (prev=%s)',
+            CHANNEL_STATE[state],
+            CHANNEL_STATE[self._state]
+        )
         self._state = state
 

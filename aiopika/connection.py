@@ -81,23 +81,33 @@ class _RWStream:
         await self._writer.wait_closed()
 
 
-@enum.unique
-class ConnectionState(enum.Enum):
-    CLOSED = 'CLOSED'
-    PROTOCOL = 'PROTOCOL'
-    START = 'START'
-    TUNE = 'TUNE'
-    OPEN = 'OPEN'
-    CLOSING = 'CLOSING'
-    OPENING = 'OPENING'
-    INIT = 'INIT'
-    ERROR = 'ERROR'
+CLOSED = 1
+PROTOCOL = 2
+START = 3
+TUNE = 4
+OPEN = 5
+CLOSING = 6
+OPENING = 7
+INIT = 8
+ERROR = 9
+
+CONNECTION_STATE = {
+    CLOSED: 'CLOSED',
+    PROTOCOL: 'PROTOCOL',
+    START: 'START',
+    TUNE: 'TUNE',
+    OPEN: 'OPEN',
+    CLOSING: 'CLOSING',
+    OPENING: 'OPENING',
+    INIT: 'INIT',
+    ERROR: 'ERROR',
+}
 
 
 class Connection(EventDispatcherObject):
     _channels: Dict[int, Channel]
     _error: Optional[BaseException]
-    _state: ConnectionState
+    _state: int
     server_capabilities: Dict
 
     __state_waiter: Optional[Waiter]
@@ -106,10 +116,14 @@ class Connection(EventDispatcherObject):
         """TODO: for implementing reconnect and continuing store the data
 
         """
-        self._set_connection_state(ConnectionState.INIT)
+        self._set_connection_state(INIT)
 
-    def _set_connection_state(self, state: ConnectionState) -> None:
-        LOGGER.debug('New Connection state: %s (prev=%s)', state, self._state)
+    def _set_connection_state(self, state: int) -> None:
+        LOGGER.debug(
+            'New Connection state: %s (prev=%s)',
+            CONNECTION_STATE[state],
+            CONNECTION_STATE[self._state]
+        )
         self._state = state
         if self.__state_waiter is not None:
             self.__state_waiter.check(state)
@@ -134,7 +148,7 @@ class Connection(EventDispatcherObject):
         else:
             self.params = ConnectionParameters()
 
-        self._state = ConnectionState.CLOSED
+        self._state = CLOSED
 
         self.server_capabilities = {}
         self.server_properties = None
@@ -161,21 +175,21 @@ class Connection(EventDispatcherObject):
 
     @property
     def is_closed(self) -> bool:
-        return self._state == ConnectionState.CLOSED or \
-            self._state == ConnectionState.INIT
+        return self._state == CLOSED or \
+            self._state == INIT
 
     @property
     def is_closing(self) -> bool:
-        return self._state == ConnectionState.CLOSING
+        return self._state == CLOSING
 
     @property
     def is_open(self) -> bool:
-        return self._state == ConnectionState.OPEN
+        return self._state == OPEN
 
     @property
     def is_opening(self) -> bool:
-        return self._state == ConnectionState.PROTOCOL or \
-            self._state == ConnectionState.OPENING
+        return self._state == PROTOCOL or \
+            self._state == OPENING
 
     @property
     def basic_nack(self) -> bool:
@@ -238,7 +252,7 @@ class Connection(EventDispatcherObject):
             LOGGER.error('Stream terminated in unexpected fashion: %s', error)
         self._remove_heartbeat()
         self._stream.terminate()
-        self._set_connection_state(ConnectionState.CLOSED)
+        self._set_connection_state(CLOSED)
 
     async def _read_data(self, n: int = -1):
         if n < 0:
@@ -317,7 +331,7 @@ class Connection(EventDispatcherObject):
         await self._flush_data()
 
     async def _stream_connected(self, reader, writer):
-        self._set_connection_state(ConnectionState.PROTOCOL)
+        self._set_connection_state(PROTOCOL)
         self._stream = _RWStream(reader, writer)
         self._frame_decoder = FrameDecoder(self._stream)
         await self._send_frame(frame.ProtocolHeader())
@@ -391,7 +405,7 @@ class Connection(EventDispatcherObject):
         while not self.is_closed:
             await self._process_next_frame()
 
-    async def _wait_state(self, expected: ConnectionState):
+    async def _wait_state(self, expected: int):
         assert self.__state_waiter is None, 'Frame waiter override error'
         self.__state_waiter = Waiter(lambda state: state == expected)
         await self.__state_waiter.wait()
@@ -403,9 +417,9 @@ class Connection(EventDispatcherObject):
                 f'Connection require connected connection: {self}'
             )
 
-        self._set_connection_state(ConnectionState.OPENING)
+        self._set_connection_state(OPENING)
         try:
-            await self._wait_state(ConnectionState.OPEN)
+            await self._wait_state(OPEN)
         except Exception as error:
             self.terminate(error)
             raise
@@ -464,7 +478,7 @@ class Connection(EventDispatcherObject):
 
     async def disconnect(self, error: BaseException = None):
         await self._stream.close()
-        self._set_connection_state(ConnectionState.CLOSED)
+        self._set_connection_state(CLOSED)
 
     async def close(self, reply_code: int = 200, reply_text: str = 'Normal shutdown'):
         if self.is_closing or self.is_closed:
@@ -488,7 +502,7 @@ class Connection(EventDispatcherObject):
             self.terminate(error)
             raise error
 
-        self._set_connection_state(ConnectionState.CLOSING)
+        self._set_connection_state(CLOSING)
         LOGGER.info('Closing connection (%s): %s', reply_code, reply_text)
 
         if self._channels:
@@ -500,7 +514,7 @@ class Connection(EventDispatcherObject):
                 0,
                 spec.Connection.Close(error.reply_code, error.reply_text, 0, 0)
             )
-            await self._wait_state(ConnectionState.CLOSED)
+            await self._wait_state(CLOSED)
         except: # @[TODO] da fare il raise della giusta eccezzione
             self.terminate(error)
             raise
@@ -559,7 +573,7 @@ class Connection(EventDispatcherObject):
         return auth_type, response
 
     async def _on_connection_start(self, method_frame):
-        self._set_connection_state(ConnectionState.START)
+        self._set_connection_state(START)
 
         if is_protocol_header(method_frame):
             raise exceptions.UnexpectedFrameError(method_frame)
@@ -613,7 +627,7 @@ class Connection(EventDispatcherObject):
         return val
 
     async def _on_connection_tune(self, method_frame):
-        self._set_connection_state(ConnectionState.TUNE)
+        self._set_connection_state(TUNE)
 
         self.params.channel_max = Connection._negotiate_integer_value(
             self.params.channel_max, method_frame.method.channel_max)
@@ -659,7 +673,7 @@ class Connection(EventDispatcherObject):
 
     async def _on_connection_closeok(self, method_frame):
         LOGGER.debug('_on_connection_closeok: frame=%s', method_frame)
-        self._set_connection_state(ConnectionState.CLOSED)
+        self._set_connection_state(CLOSED)
 
     async def _on_connection_close(self, method_frame):
         LOGGER.debug(
@@ -709,7 +723,7 @@ class Connection(EventDispatcherObject):
 
     async def _on_connection_openok(self, method_frame):
         self.known_hosts = method_frame.method.known_hosts
-        self._set_connection_state(ConnectionState.OPEN)
+        self._set_connection_state(OPEN)
 
     #
     ## end
