@@ -726,5 +726,7 @@ class Connection(EventDispatcherObject):
             await self.close()
             await self.disconnect()
             await loop
-        asyncio.run(closure())
+
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(closure())
 

@@ -28,7 +28,7 @@ setuptools.setup(
     },
     python_requires='>=3.6',
     classifiers=[
-        'Development Status :: 5 - Development/Initial release',
+        'Development Status :: 5 - Alpha release',
         'Intended Audience :: Developers',
         #'License :: OSI Approved :: BSD License',
         'Natural Language :: English',
