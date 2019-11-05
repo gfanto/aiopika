@@ -60,28 +60,27 @@ class AsyncChannel(channel.Channel):
             partial(self._handle_consumer_ex, consumer_tag)
         )
 
-    # @[OPT] toggle comment this enable/disable the task creation of rpc callbacks
-    async def _dispatch_callback(self, callback, *args, **kwargs):
-        return _create_task(
-            super()._dispatch_callback(callback, *args, **kwargs),
-            self._handle_callback_ex
-        )
+    # async def _dispatch_callback(self, callback, *args, **kwargs):
+    #     return _create_task(
+    #         super()._dispatch_callback(callback, *args, **kwargs),
+    #         self._handle_callback_ex
+    #     )
 
-    async def _dispatch_frame(self, frame_value):
-        return _create_task(
-            super()._dispatch_frame(frame_value),
-            self._handle_frame_ex
-        )
+    # async def _dispatch_frame(self, frame_value):
+    #     return _create_task(
+    #         super()._dispatch_frame(frame_value),
+    #         self._handle_frame_ex
+    #     )
 
-    async def _dispatch_method(self, method_frame, header_frame, body):
-        return _create_task(
-            super()._dispatch_method(
-                method_frame,
-                header_frame,
-                body
-            ),
-            self._handle_method_ex
-        )
+    # async def _dispatch_method(self, method_frame, header_frame, body):
+    #     return _create_task(
+    #         super()._dispatch_method(
+    #             method_frame,
+    #             header_frame,
+    #             body
+    #         ),
+    #         self._handle_method_ex
+    #     )
 
     def _handle_consumer_ex(self, consumer_tag, fut, ex):
         LOGGER.warning(
@@ -93,26 +92,26 @@ class AsyncChannel(channel.Channel):
         fut.print_stack(file=traceback_buf)
         LOGGER.debug(traceback_buf.getvalue())
 
-    def _handle_callback_ex(self, fut, ex):
-        LOGGER.warning(
-            'During callback dispatch an exception occourred: %s',
-            ex
-        )
-        traceback_buf = StringIO()
-        fut.print_stack(file=traceback_buf)
-        LOGGER.debug(traceback_buf.getvalue())
+    # def _handle_callback_ex(self, fut, ex):
+    #     LOGGER.warning(
+    #         'During callback dispatch an exception occourred: %s',
+    #         ex
+    #     )
+    #     traceback_buf = StringIO()
+    #     fut.print_stack(file=traceback_buf)
+    #     LOGGER.debug(traceback_buf.getvalue())
 
-    def _handle_frame_ex(self, fut, ex):
-        LOGGER.warning('During frame dispatch an exception occourred: %s', ex)
-        traceback_buf = StringIO()
-        fut.print_stack(file=traceback_buf)
-        LOGGER.debug(traceback_buf.getvalue())
+    # def _handle_frame_ex(self, fut, ex):
+    #     LOGGER.warning('During frame dispatch an exception occourred: %s', ex)
+    #     traceback_buf = StringIO()
+    #     fut.print_stack(file=traceback_buf)
+    #     LOGGER.debug(traceback_buf.getvalue())
 
-    def _handle_method_ex(self, fut, ex):
-        LOGGER.warning('During method dispatch an exception occourred: %s', ex)
-        traceback_buf = StringIO()
-        fut.print_stack(file=traceback_buf)
-        LOGGER.debug(traceback_buf.getvalue())
+    # def _handle_method_ex(self, fut, ex):
+    #     LOGGER.warning('During method dispatch an exception occourred: %s', ex)
+    #     traceback_buf = StringIO()
+    #     fut.print_stack(file=traceback_buf)
+    #     LOGGER.debug(traceback_buf.getvalue())
 
     async def __aenter__(self):
         if self.is_closed:
@@ -166,11 +165,11 @@ class AsyncConnection(connection.Connection):
             self.__process_frame_loop.result()
         self.__process_frame_loop = None
 
-    async def _dispatch_frame(self, frame_value: frame.Frame):
-        return _create_task(
-            super()._dispatch_frame(frame_value),
-            self._handle_frame_ex
-        )
+    # async def _dispatch_frame(self, frame_value: frame.Frame):
+    #     return _create_task(
+    #         super()._dispatch_frame(frame_value),
+    #         self._handle_frame_ex
+    #     )
 
     async def _deliver_frame_to_channel(self, frame_value):
         return _create_task(
@@ -178,11 +177,11 @@ class AsyncConnection(connection.Connection):
             partial(self._handle_deliver_ex, frame_value.channel_number)
         )
 
-    def _handle_frame_ex(self, fut, ex):
-        LOGGER.warning('During frame dispatch an exception occourred: %s', ex)
-        traceback_buf = StringIO()
-        fut.print_stack(file=traceback_buf)
-        LOGGER.debug(traceback_buf.getvalue())
+    # def _handle_frame_ex(self, fut, ex):
+    #     LOGGER.warning('During frame dispatch an exception occourred: %s', ex)
+    #     traceback_buf = StringIO()
+    #     fut.print_stack(file=traceback_buf)
+    #     LOGGER.debug(traceback_buf.getvalue())
 
     def _handle_deliver_ex(self, channel, fut, ex):
         LOGGER.warning(
@@ -249,4 +248,9 @@ class BlockingConnection(AsyncConnection):
     def _create_channel(self, channel_number: int):
         LOGGER.debug('Creating channel %s', channel_number)
         return BlockingChannel(self, channel_number)
+
+    async def channel(self, channel_number: int = -1):
+        ch = super().channel(channel_number)
+        await ch.open()
+        return ch
 
