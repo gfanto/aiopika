@@ -130,11 +130,6 @@ class Connection(EventDispatcherObject):
     def __init__(self, parameters: Parameters = None):
         super(Connection, self).__init__()
         self._loop = asyncio.get_event_loop()
-        # if __debug__:
-        #     def debug_exception_handler(loop, context):
-        #         exc = context['exception']
-        #         LOGGER.error(f'Handled exception: {exc}')
-        #     self._loop.set_exception_handler(debug_exception_handler)
 
         if parameters is not None:
             saved_ssl_options = parameters.ssl_options
@@ -164,7 +159,7 @@ class Connection(EventDispatcherObject):
         #self._frame_decoder = None
 
         self.__state_waiter = None
-        self.__process_frame_lock = asyncio.Lock()# @[???] serve
+        self.__process_frame_lock = asyncio.Lock()
 
         self._init_connection_state()
 
@@ -512,7 +507,7 @@ class Connection(EventDispatcherObject):
                 spec.Connection.Close(error.reply_code, error.reply_text, 0, 0)
             )
             await self._wait_state(CLOSED)
-        except: # @[TODO] da fare il raise della giusta eccezzione
+        except:
             self.terminate(error)
             raise
 
