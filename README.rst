@@ -12,7 +12,9 @@ To boost performance even more you can install uvloop and this will be enable au
 Example
 -------
 Simple publisher example:
+
 .. code :: python
+
 	from aiopika import BlockingConnection
 	async with BlockingConnection() as conn:
 		ch = conn.channel()
@@ -20,8 +22,10 @@ Simple publisher example:
 			await ch.queue_declare('myqueue', passive=True)
 			await ch.basic_publish('', 'myqueue', b'Hello, World!')
 
-An example of writing a blocking consumer
+An example of writing a blocking consumer:
+
 .. code :: python
+
 	import signal
 	import asyncio
 	from functools import partial
@@ -41,6 +45,7 @@ An example of writing a blocking consumer
 			await ch.basic_consume('myqueue', on_message)
 			await ch.start_consuming()
 
-Documentation:
+Documentation
+-------------
 TODO
 
