@@ -59,7 +59,9 @@ class EventDispatcherObject:
             for method_name in dir(class_):
                 method = getattr(class_, method_name)
                 if isclass(method) and issubclass(method, amqp_object.Method):
-                    _method_to_callback_name[method] = '_on_' + class_name.lower() + '_' + method_name.lower()
+                    _method_to_callback_name[method] = (
+                        f'_on_{class_name.lower()}_{method_name.lower()}'
+                    )
 
     try:
         del class_name
@@ -80,7 +82,11 @@ class EventDispatcherObject:
 
     def __inspect_event_callbacks(self):
         for method in self._method_to_callback_name:
-            self.__dispatcher[method] = getattr(self, self._method_to_callback_name[method], None)
+            self.__dispatcher[method] = getattr(
+                self,
+                self._method_to_callback_name[method],
+                None
+            )
         for attr in dir(self):
             if attr.startswith(self.EVENT_PREFIX) and \
                 attr not in self._method_to_callback_name.values():
@@ -90,9 +96,11 @@ class EventDispatcherObject:
         self.__dispatcher = dict()
         self.__inspect_event_callbacks()
 
-    def _dispatch_event(self,
-                        event,
-                        apply: Callable = get_key):
+    def _dispatch_event(
+        self,
+        event,
+        apply: Callable = get_key
+    ):
         try:
             return self.__dispatcher[apply(event)]
         except KeyError:
