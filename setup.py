@@ -19,7 +19,7 @@ setuptools.setup(
     maintainer='Gianmarco Fantinuoli',
     maintainer_email='gianmarco.fanti@gmail.com',
     packages=setuptools.find_packages(include=['aiopika', 'aiopika.*']),
-    #license='BSD',
+    license='MIT',
     install_requires=requirements,
     package_data={'': ['LICENSE', 'README.rst']},
     extras_require={
