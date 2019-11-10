@@ -10,8 +10,7 @@ from typing import Callable, Union, Dict
 from . import spec
 from . import amqp_object
 from . import exceptions
-
-from ._frame import get_key
+from .frame import get_key
 
 
 __all__ = ['EventManagerObject', 'Waiter']

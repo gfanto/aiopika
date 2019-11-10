@@ -2,7 +2,7 @@ import asyncio
 import logging
 
 from . import exceptions
-from ._frame import Heartbeat
+from .frame import Heartbeat
 
 
 LOGGER = logging.getLogger(__name__)

@@ -5,24 +5,20 @@ try:
 except ImportError:
     pass
 
-__version__ = '0.001'
+__version__ = '0.1.0'
 
-import pika.amqp_object as amqp_object
-import pika.spec as spec
-import pika.frame as frame
-import pika.exceptions as exceptions
+PRODUCT = "Aiopika Python Client Library"
 
-from pika.connection import PRODUCT
-from pika.channel import MAX_CHANNELS
-from pika.connection import (
+from .channel import MAX_CHANNELS
+from .parameter import (
     Parameters,
     ConnectionParameters,
     URLParameters,
     SSLOptions
 )
-from pika.exceptions  import *
-from pika.credentials import PlainCredentials, ExternalCredentials, VALID_TYPES
+from .exceptions  import *
+from .credentials import PlainCredentials, ExternalCredentials, VALID_TYPES
 
 from .connection  import *
 from .channel     import *
-from .blocking_connection import *
+

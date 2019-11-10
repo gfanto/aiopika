@@ -1,7 +1,7 @@
 import setuptools
 
 
-requirements = ['pika', 'aiologger']
+requirements = []
 
 
 long_description = (
@@ -13,12 +13,11 @@ long_description = (
 
 setuptools.setup(
     name='aiopika',
-    version='0.9.0',
+    version='0.1.0',
     description='Aiopika Python AMQP Asyncio Client Library',
     long_description=open('README.rst').read(),
     maintainer='Gianmarco Fantinuoli',
     maintainer_email='gianmarco.fanti@gmail.com',
-    #url='https://pika.readthedocs.io',
     packages=setuptools.find_packages(include=['aiopika', 'aiopika.*']),
     #license='BSD',
     install_requires=requirements,

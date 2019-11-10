@@ -21,7 +21,7 @@ from . import exceptions
 from . import spec
 from . import amqp_object
 
-from ._frame import (
+from .frame import (
     is_method,
     is_header,
     is_body,
@@ -35,6 +35,8 @@ __all__ = ['Channel']
 
 
 LOGGER = logging.getLogger(__name__)
+
+MAX_CHANNELS = 65535  # per AMQP 0.9.1 spec.
 
 
 class _ContentFrameAssembler(object):
