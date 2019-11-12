@@ -31,8 +31,13 @@ from .channel import MAX_CHANNELS
 from .parameter import Parameters, ConnectionParameters
 
 from ._dispatch import EventDispatcherObject, Waiter
-from ._heartbeat import HeartbeatChecker
-from .frame import is_method, is_protocol_header, has_content, FrameDecoder, Heartbeat
+from .frame import (
+    is_method,
+    is_protocol_header,
+    has_content,
+    FrameDecoder,
+    Heartbeat
+)
 from .channel import Channel
 
 
@@ -129,6 +134,7 @@ class Connection(EventDispatcherObject):
     _channels: Dict[int, Channel]
     _error: Optional[BaseException]
     _state: int
+    _heartbeat_enabled: bool
     server_capabilities: Dict
 
     __state_waiter: Optional[Waiter]
@@ -174,8 +180,10 @@ class Connection(EventDispatcherObject):
         self._channels = dict()
         self._frames_sent = 0
         self._frames_received = 0
-        self._heartbeat_checker = None
+        self._heartbeat_event = asyncio.Event()
         self._blocked_conn_waiter = Waiter()
+
+        self._heartbeat_enabled = False
 
         #self._stream = None
         #self._frame_decoder = None
@@ -249,11 +257,6 @@ class Connection(EventDispatcherObject):
                 f'Connection is not open: {self._state}'
             )
 
-    def _remove_heartbeat(self) -> None:
-        if self._heartbeat_checker is not None:
-            self._heartbeat_checker.stop()
-            self._heartbeat_checker = None
-
     def terminate(self, error: BaseException = None) -> None:
         self._error = error
         if self.is_closing and error:
@@ -266,7 +269,6 @@ class Connection(EventDispatcherObject):
 
         if error:
             LOGGER.error('Stream terminated in unexpected fashion: %s', error)
-        self._remove_heartbeat()
         self._stream.terminate()
         self._set_connection_state(CLOSED)
 
@@ -387,8 +389,8 @@ class Connection(EventDispatcherObject):
             self._frames_received += 1
 
             if isinstance(frame_value, frame.Heartbeat):
-                if self._heartbeat_checker is not None:
-                    self._heartbeat_checker.received()
+                if self._heartbeat_enabled:
+                    self._heartbeat_received()
                 else:
                     LOGGER.warning(
                         'Received heartbeat frame without a heartbeat checker'
@@ -616,15 +618,69 @@ class Connection(EventDispatcherObject):
         return (self.params.frame_max - spec.FRAME_HEADER_SIZE -
                 spec.FRAME_END_SIZE)
 
-    def _create_heartbeat_checker(self):
-        if self.params.heartbeat is not None and self.params.heartbeat > 0:
-            LOGGER.debug(
-                f'Creating a HeartbeatChecker: {self.params.heartbeat}'
-            )
-            hbc = HeartbeatChecker(self, self.params.heartbeat)
-            hbc.start()
-            return hbc
-        return None
+    def _heartbeat_received(self):
+        self._heartbeat_event.set()
+
+    def _heartbeat_pulse(self) -> None:
+        if self.params.heartbeat is None or self.params.heartbeat <= 0:
+            return
+
+        LOGGER.debug(
+            f'Creating a HeartbeatChecker: {self.params.heartbeat}'
+        )
+        self._heartbeat_enabled = True
+        heartbeat_frames_sent: int = 0
+        heartbeat_frames_received: int = 0
+
+        async def heartbeat_checker():
+            nonlocal heartbeat_frames_received
+
+            check_interval = self.params.heartbeat + 5
+            while not self.is_closed:
+                try:
+                    await asyncio.wait_for(
+                        self._heartbeat_event.wait(),
+                        check_interval
+                    )
+                    heartbeat_frames_received += 1
+
+                    LOGGER.debug(
+                        f'Received {heartbeat_frames_received} heartbeat '
+                        f'frames, sent {heartbeat_frames_sent} '
+                    )
+                    self._heartbeat_event.clear()
+                except asyncio.TimeoutError:
+                    self.terminate(
+                        exceptions.AMQPHeartbeatTimeout(
+                            f'No activity or too many missed heartbeats '
+                            f'in the last {self.params.heartbeat} seconds'
+                        )
+                    )
+
+        async def heartbeat_sender():
+            nonlocal heartbeat_frames_sent
+
+            send_interval = float(self.params.heartbeat) / 2.0
+            while not self.is_closed:
+                await asyncio.sleep(send_interval)
+                heartbeat_frames_sent += 1
+                LOGGER.debug('Sending heartbeat frame #%i', heartbeat_frames_sent)
+                await self._send_frame(Heartbeat())
+
+        def handle_checker_ex(fut, ex):
+            traceback_buf = StringIO()
+            fut.print_stack(file=traceback_buf)
+            LOGGER.debug(traceback_buf.getvalue())
+            #self.terminate(ex)
+
+        def handle_sender_ex(fut, ex):
+            traceback_buf = StringIO()
+            fut.print_stack(file=traceback_buf)
+            LOGGER.debug(traceback_buf.getvalue())
+            #self.terminate(ex)
+
+        _create_task(heartbeat_sender(), handle_sender_ex)
+        _create_task(heartbeat_checker(), handle_checker_ex)
 
     @staticmethod
     def _negotiate_integer_value(client_value, server_value):
@@ -669,9 +725,7 @@ class Connection(EventDispatcherObject):
 
         self._body_max_length = self._get_body_frame_max_length()
 
-        if self.params.heartbeat is not None:
-            self._heartbeat_checker = self._create_heartbeat_checker()
-
+        self._heartbeat_pulse()
         await self._send_method(
             0,
             spec.Connection.TuneOk(

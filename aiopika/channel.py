@@ -679,7 +679,7 @@ class Channel(EventDispatcherObject):
         nowait = callback  is None
 
         await self._rpc(spec.Queue.Purge(0, queue, nowait),
-            [spec.Queue.PurgeOk] if callback else [],
+            [spec.Queue.PurgeOk] if nowait else [],
             callback
 
         )
@@ -720,17 +720,17 @@ class Channel(EventDispatcherObject):
     async def _on_queue_deleteok(self, method_frame):
         LOGGER.debug('Queue.DeleteOk Received: %s', method_frame)
 
-    async def tx_commit(self, callback: Callable = None):#ma un po di nowait qui??
+    async def tx_commit(self, callback: Callable = None):
         self._validate_coroutine(callback)
         self._raise_if_not_open()
         await self._rpc(spec.Tx.Commit(), [spec.Tx.CommitOk], callback)
 
-    async def tx_rollback(self, callback: Callable = None):#ma un po di nowait qui??
+    async def tx_rollback(self, callback: Callable = None):
         self._validate_coroutine(callback)
         self._raise_if_not_open()
         await self._rpc(spec.Tx.Rollback(), [spec.Tx.RollbackOk], callback)
 
-    async def tx_select(self, callback: Callable = None):#ma un po di nowait qui??
+    async def tx_select(self, callback: Callable = None):
         self._validate_coroutine(callback)
         self._raise_if_not_open()
         await self._rpc(spec.Tx.Select(), [spec.Tx.SelectOk], callback)
