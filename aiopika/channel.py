@@ -16,6 +16,7 @@ from typing import (
 )
 from inspect import iscoroutinefunction
 from functools import partial
+from io import StringIO
 
 from . import frame
 from . import exceptions
