@@ -106,3 +106,17 @@ class EventDispatcherObject:
         except KeyError:
             raise exceptions.UnexpectedFrameError(event)
 
+
+def create_task(coro, exception_handler):
+    def result_handler(f):
+        try:
+            f.result()
+        except asyncio.CancelledError:
+            pass
+        except BaseException as ex:
+            exception_handler(f, f.exception())
+
+    t = asyncio.create_task(coro)
+    t.add_done_callback(result_handler)
+    return t
+

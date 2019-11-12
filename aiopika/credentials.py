@@ -46,7 +46,12 @@ the required behavior.
 """
 import logging
 
+
+__all__ = ['PlainCredentials', 'ExternalCredentials', 'VALID_TYPES']
+
 LOGGER = logging.getLogger(__name__)
+
+
 
 
 def _as_bytes(value):
@@ -160,3 +165,4 @@ class ExternalCredentials(object):
 
 # Append custom credential types to this list for validation support
 VALID_TYPES = [PlainCredentials, ExternalCredentials]
+

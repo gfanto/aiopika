@@ -15,6 +15,7 @@ from typing import (
     Optional
 )
 from inspect import iscoroutinefunction
+from functools import partial
 
 from . import frame
 from . import exceptions
@@ -28,10 +29,10 @@ from .frame import (
     has_content,
     is_method_instance_of
 )
-from ._dispatch import EventDispatcherObject, Waiter
+from ._dispatch import EventDispatcherObject, Waiter, create_task
 
 
-__all__ = ['Channel']
+__all__ = ['Channel', 'BlockingChannel', 'AsyncChannel']
 
 
 LOGGER = logging.getLogger(__name__)
@@ -937,3 +938,124 @@ class Channel(EventDispatcherObject):
         )
         self._state = state
 
+
+class AsyncChannel(Channel):
+    async def _dispatch_consumer(
+        self,
+        consumer_tag,
+        method_frame,
+        header_frame,
+        body
+    ):
+        return create_task(
+            super()._dispatch_consumer(
+                consumer_tag,
+                method_frame,
+                header_frame,
+                body
+            ),
+            partial(self._handle_consumer_ex, consumer_tag)
+        )
+
+    # async def _dispatch_callback(self, callback, *args, **kwargs):
+    #     return create_task(
+    #         super()._dispatch_callback(callback, *args, **kwargs),
+    #         self._handle_callback_ex
+    #     )
+
+    # async def _dispatch_frame(self, frame_value):
+    #     return create_task(
+    #         super()._dispatch_frame(frame_value),
+    #         self._handle_frame_ex
+    #     )
+
+    # async def _dispatch_method(self, method_frame, header_frame, body):
+    #     return create_task(
+    #         super()._dispatch_method(
+    #             method_frame,
+    #             header_frame,
+    #             body
+    #         ),
+    #         self._handle_method_ex
+    #     )
+
+    def _handle_consumer_ex(self, consumer_tag, fut, ex):
+        LOGGER.warning(
+            'During consumer (%s) dispatch an exception occourred: %s',
+            consumer_tag,
+            ex
+        )
+        traceback_buf = StringIO()
+        fut.print_stack(file=traceback_buf)
+        LOGGER.debug(traceback_buf.getvalue())
+
+    # def _handle_callback_ex(self, fut, ex):
+    #     LOGGER.warning(
+    #         'During callback dispatch an exception occourred: %s',
+    #         ex
+    #     )
+    #     traceback_buf = StringIO()
+    #     fut.print_stack(file=traceback_buf)
+    #     LOGGER.debug(traceback_buf.getvalue())
+
+    # def _handle_frame_ex(self, fut, ex):
+    #     LOGGER.warning('During frame dispatch an exception occourred: %s', ex)
+    #     traceback_buf = StringIO()
+    #     fut.print_stack(file=traceback_buf)
+    #     LOGGER.debug(traceback_buf.getvalue())
+
+    # def _handle_method_ex(self, fut, ex):
+    #     LOGGER.warning('During method dispatch an exception occourred: %s', ex)
+    #     traceback_buf = StringIO()
+    #     fut.print_stack(file=traceback_buf)
+    #     LOGGER.debug(traceback_buf.getvalue())
+
+    async def __aenter__(self):
+        if self.is_closed:
+            await self.open()
+        return self
+
+    async def __aexit__(self, exc_type, exc_value, traceback):
+        await self.close()
+
+
+class BlockingChannel(AsyncChannel):
+    def __init__(self, connection, channel_number: int):
+        super().__init__(connection, channel_number)
+        self.__consume_waiter = None
+
+    async def start_consuming(self):
+        if self.__consume_waiter is not None:
+            raise RuntimeError(
+                f'Channel {self.channel_number} is already consuming'
+            )
+        self.__consume_waiter = Waiter()
+        await self.__consume_waiter.wait()
+        self.__consume_waiter = None
+
+    async def _cancel_all_consumers(self):
+        LOGGER.debug(f'Cancelling %s consumers', len(self._consumers))
+
+        await asyncio.gather(
+            *(self.basic_cancel(consumer_tag)
+                for consumer_tag in self._consumers
+            )
+        )
+
+    async def stop_consuming(self, consumer_tag=None):
+        try:
+            if consumer_tag:
+                await self.basic_cancel(consumer_tag)
+            else:
+                await self._cancel_all_consumers()
+        finally:
+            self.terminate_consuming()
+
+    def terminate_consuming(self):
+        if self.__consume_waiter is not None:
+            self.__consume_waiter.check()
+            self.__consume_waiter =  None
+
+    def _transition_to_closed(self):
+        self.terminate_consuming()
+        super()._transition_to_closed()

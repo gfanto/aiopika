@@ -46,7 +46,10 @@ from . import spec
 from . import credentials
 
 
+__all__ = ['Parameters', 'ConnectionParameters', 'URLParameters', 'SSLOptions']
+
 LOGGER = logging.getLogger(__name__)
+
 
 
 class Parameters(object):  # pylint: disable=R0902

@@ -26,11 +26,8 @@ from . import spec
 from . import frame
 from . import amqp_object
 from . import exceptions
-from . import channel
-from .channel import MAX_CHANNELS
+from ._dispatch import EventDispatcherObject, Waiter, create_task
 from .parameter import Parameters, ConnectionParameters
-
-from ._dispatch import EventDispatcherObject, Waiter
 from .frame import (
     is_method,
     is_protocol_header,
@@ -38,32 +35,12 @@ from .frame import (
     FrameDecoder,
     Heartbeat
 )
-from .channel import Channel
+from .channel import Channel, AsyncChannel, BlockingChannel, MAX_CHANNELS
 
 
-__all__ = [
-    'Connection',
-    'BlockingConnection',
-    'BlockingChannel',
-    'AsyncChannel',
-    'AsyncConnection'
-]
+__all__ = ['Connection', 'BlockingConnection', 'AsyncConnection']
 
 LOGGER = logging.getLogger(__name__)
-
-
-def _create_task(coro, exception_handler):
-    def _result_handler(f):
-        try:
-            f.result()
-        except asyncio.CancelledError:
-            pass
-        except BaseException as ex:
-            exception_handler(f, f.exception())
-
-    t = asyncio.create_task(coro)
-    t.add_done_callback(_result_handler)
-    return t
 
 
 class _RWStream:
@@ -452,7 +429,7 @@ class Connection(EventDispatcherObject):
                 return num
         return len(self._channels) + 1
 
-    def _create_channel(self, channel_number: int) -> channel.Channel:
+    def _create_channel(self, channel_number: int) -> Channel:
         LOGGER.debug('Creating channel %s', channel_number)
         return Channel(self, channel_number)
 
@@ -679,8 +656,8 @@ class Connection(EventDispatcherObject):
             LOGGER.debug(traceback_buf.getvalue())
             #self.terminate(ex)
 
-        _create_task(heartbeat_sender(), handle_sender_ex)
-        _create_task(heartbeat_checker(), handle_checker_ex)
+        create_task(heartbeat_sender(), handle_sender_ex)
+        create_task(heartbeat_checker(), handle_checker_ex)
 
     @staticmethod
     def _negotiate_integer_value(client_value, server_value):
@@ -814,86 +791,6 @@ class Connection(EventDispatcherObject):
         loop.run_until_complete(closure())
 
 
-class AsyncChannel(Channel):
-    async def _dispatch_consumer(
-        self,
-        consumer_tag,
-        method_frame,
-        header_frame,
-        body
-    ):
-        return _create_task(
-            super()._dispatch_consumer(
-                consumer_tag,
-                method_frame,
-                header_frame,
-                body
-            ),
-            partial(self._handle_consumer_ex, consumer_tag)
-        )
-
-    # async def _dispatch_callback(self, callback, *args, **kwargs):
-    #     return _create_task(
-    #         super()._dispatch_callback(callback, *args, **kwargs),
-    #         self._handle_callback_ex
-    #     )
-
-    # async def _dispatch_frame(self, frame_value):
-    #     return _create_task(
-    #         super()._dispatch_frame(frame_value),
-    #         self._handle_frame_ex
-    #     )
-
-    # async def _dispatch_method(self, method_frame, header_frame, body):
-    #     return _create_task(
-    #         super()._dispatch_method(
-    #             method_frame,
-    #             header_frame,
-    #             body
-    #         ),
-    #         self._handle_method_ex
-    #     )
-
-    def _handle_consumer_ex(self, consumer_tag, fut, ex):
-        LOGGER.warning(
-            'During consumer (%s) dispatch an exception occourred: %s',
-            consumer_tag,
-            ex
-        )
-        traceback_buf = StringIO()
-        fut.print_stack(file=traceback_buf)
-        LOGGER.debug(traceback_buf.getvalue())
-
-    # def _handle_callback_ex(self, fut, ex):
-    #     LOGGER.warning(
-    #         'During callback dispatch an exception occourred: %s',
-    #         ex
-    #     )
-    #     traceback_buf = StringIO()
-    #     fut.print_stack(file=traceback_buf)
-    #     LOGGER.debug(traceback_buf.getvalue())
-
-    # def _handle_frame_ex(self, fut, ex):
-    #     LOGGER.warning('During frame dispatch an exception occourred: %s', ex)
-    #     traceback_buf = StringIO()
-    #     fut.print_stack(file=traceback_buf)
-    #     LOGGER.debug(traceback_buf.getvalue())
-
-    # def _handle_method_ex(self, fut, ex):
-    #     LOGGER.warning('During method dispatch an exception occourred: %s', ex)
-    #     traceback_buf = StringIO()
-    #     fut.print_stack(file=traceback_buf)
-    #     LOGGER.debug(traceback_buf.getvalue())
-
-    async def __aenter__(self):
-        if self.is_closed:
-            await self.open()
-        return self
-
-    async def __aexit__(self, exc_type, exc_value, traceback):
-        await self.close()
-
-
 class AsyncConnection(Connection):
     def __init__(self, parameters: Parameters = None):
         super().__init__(parameters)
@@ -938,13 +835,13 @@ class AsyncConnection(Connection):
         self.__process_frame_loop = None
 
     # async def _dispatch_frame(self, frame_value: frame.Frame):
-    #     return _create_task(
+    #     return create_task(
     #         super()._dispatch_frame(frame_value),
     #         self._handle_frame_ex
     #     )
 
     async def _deliver_frame_to_channel(self, frame_value):
-        return _create_task(
+        return create_task(
             super()._deliver_frame_to_channel(frame_value),
             partial(self._handle_deliver_ex, frame_value.channel_number)
         )
@@ -972,48 +869,6 @@ class AsyncConnection(Connection):
 
     async def __aexit__(self, exc_type, exc_value, traceback):
         await self.close()
-
-
-class BlockingChannel(AsyncChannel):
-    def __init__(self, connection, channel_number: int):
-        super().__init__(connection, channel_number)
-        self.__consume_waiter = None
-
-    async def start_consuming(self):
-        if self.__consume_waiter is not None:
-            raise RuntimeError(
-                f'Channel {self.channel_number} is already consuming'
-            )
-        self.__consume_waiter = Waiter()
-        await self.__consume_waiter.wait()
-        self.__consume_waiter = None
-
-    async def _cancel_all_consumers(self):
-        LOGGER.debug(f'Cancelling %s consumers', len(self._consumers))
-
-        await asyncio.gather(
-            *(self.basic_cancel(consumer_tag)
-                for consumer_tag in self._consumers
-            )
-        )
-
-    async def stop_consuming(self, consumer_tag=None):
-        try:
-            if consumer_tag:
-                await self.basic_cancel(consumer_tag)
-            else:
-                await self._cancel_all_consumers()
-        finally:
-            self.terminate_consuming()
-
-    def terminate_consuming(self):
-        if self.__consume_waiter is not None:
-            self.__consume_waiter.check()
-            self.__consume_waiter =  None
-
-    def _transition_to_closed(self):
-        self.terminate_consuming()
-        super()._transition_to_closed()
 
 
 class BlockingConnection(AsyncConnection):
