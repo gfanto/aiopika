@@ -98,13 +98,13 @@ class _ContentFrameAssembler(object):
         self._ready = False
 
 
-CLOSE = 1
+CLOSED = 1
 OPENING = 2
 OPEN = 3
 CLOSING = 4
 
 CHANNEL_STATE = {
-    CLOSE: 'CLOSE',
+    CLOSED: 'CLOSED',
     OPENING: 'OPENING',
     OPEN: 'OPEN',
     CLOSING: 'CLOSING',
@@ -140,7 +140,7 @@ class Channel(EventDispatcherObject):
         self._cancelled = set()
         self._consumers = dict()
         self._consumers_with_noack = set()
-        self._state = CLOSE
+        self._state = CLOSED
         self._closing_reason = None
 
         self.__getok_callback = None
@@ -562,7 +562,7 @@ class Channel(EventDispatcherObject):
 
     @property
     def is_closed(self):
-        return self._state == CLOSE
+        return self._state == CLOSED
 
     @property
     def is_closing(self):
@@ -759,7 +759,7 @@ class Channel(EventDispatcherObject):
         assert not self.is_closed
         assert self._closing_reason is not None
 
-        self._set_channel_state(CLOSE)
+        self._set_channel_state(CLOSED)
         self._cleanup()
 
     async def _on_channel_close(self, method_frame):
@@ -819,6 +819,20 @@ class Channel(EventDispatcherObject):
         else:
             LOGGER.info('Channel open: %s', self)
             self._set_channel_state(OPEN)
+
+    def terminate(self, error: BaseException = None) -> None:
+        if self.is_closed:
+            raise exceptions.ChannelWrongStateError(
+                'Trying to terminate an already closed channel'
+            )
+        if error:
+            if self.is_closing:
+                LOGGER.warning('Error while channel is closing')
+                return
+            self._closing_reason = error
+            LOGGER.error('Stream terminated in unexpected fashion: %s', error)
+        self._transition_to_closed()
+        self._set_channel_state(CLOSED)
 
     def _dispatch_consumer(
         self,
@@ -916,7 +930,7 @@ class Channel(EventDispatcherObject):
         elif self._state == CLOSING:
             raise exceptions.ChannelWrongStateError('Channel is closing.')
         else:
-            assert self._state == CLOSE
+            assert self._state == CLOSED
             raise exceptions.ChannelWrongStateError('Channel is closed.')
 
     def _validate_coroutine(self, *args):
@@ -989,6 +1003,8 @@ class AsyncChannel(Channel):
         traceback_buf = StringIO()
         fut.print_stack(file=traceback_buf)
         LOGGER.debug(traceback_buf.getvalue())
+        if not self.is_closed:
+            self.terminate()
 
     # def _handle_callback_ex(self, fut, ex):
     #     LOGGER.warning(

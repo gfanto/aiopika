@@ -109,7 +109,7 @@ CONNECTION_STATE = {
 
 class Connection(EventDispatcherObject):
     _channels: Dict[int, Channel]
-    _error: Optional[BaseException]
+    _closing_reason: Optional[BaseException]
     _state: int
     _heartbeat_enabled: bool
     server_capabilities: Dict
@@ -226,7 +226,7 @@ class Connection(EventDispatcherObject):
 
     @property
     def closing_reason(self) -> Optional[BaseException]:
-        return self._error
+        return self._closing_reason
 
     def _raise_if_not_open(self) -> None:
         if not self.is_open:
@@ -234,18 +234,28 @@ class Connection(EventDispatcherObject):
                 f'Connection is not open: {self._state}'
             )
 
+    def _terminate_channel(self, ch: Channel, error: BaseException = None):
+        try:
+            ch.terminate(error)
+        except:
+            self._channels.pop(ch.channel_number, None)
+
+    def _terminate_channels(self, error: BaseException = None) -> None:
+        for ch in list(self._channels.values()):
+            self._terminate_channel(ch)
+
     def terminate(self, error: BaseException = None) -> None:
-        self._error = error
-        if self.is_closing and error:
-            LOGGER.warning('Error while connection is closing')
-            return
         if self.is_closed:
             raise exceptions.ConnectionWrongStateError(
                 'Trying to terminate an already closed connection'
             )
-
         if error:
+            if self.is_closing:
+                LOGGER.warning('Error while connection is closing')
+                return
+            self._closing_reason = error
             LOGGER.error('Stream terminated in unexpected fashion: %s', error)
+        self._terminate_channels(error)
         self._stream.terminate()
         self._set_connection_state(CLOSED)
 
@@ -266,10 +276,12 @@ class Connection(EventDispatcherObject):
         marshaled_frame = frame_value.marshal()
         self._emit_marshaled_frames([marshaled_frame])
 
-    def _emit_message(self,
-                      channel_number: int,
-                      method_frame: amqp_object.Method,
-                      content: tuple):
+    def _emit_message(
+        self,
+        channel_number: int,
+        method_frame: amqp_object.Method,
+        content: tuple
+    ):
         length = len(content[1])
         marshaled_body_frames = []
 
@@ -290,17 +302,22 @@ class Connection(EventDispatcherObject):
 
         self._emit_marshaled_frames(marshaled_body_frames)
 
-    def _emit_method(self,
-                     channel_number: int,
-                     method: amqp_object.Method,
-                     content: tuple = None):
+    def _emit_method(
+        self,
+        channel_number: int,
+        method: amqp_object.Method,
+        content: tuple = None
+    ):
         if content:
             self._emit_message(channel_number, method, content)
         else:
             self._emit_frame(frame.Method(channel_number, method))
 
     async def _flush_data(self):
-        await self._stream.flush()
+        try:
+            await self._stream.flush()
+        except ConnectionResetError as ex:
+            self.terminate(ex)
 
     async def _send_frame(self, frame_value: frame.Frame):
         self._emit_frame(frame_value)
@@ -473,7 +490,11 @@ class Connection(EventDispatcherObject):
         await self._stream.close()
         self._set_connection_state(CLOSED)
 
-    async def close(self, reply_code: int = 200, reply_text: str = 'Normal shutdown'):
+    async def close(
+        self,
+        reply_code: int = 200,
+        reply_text: str = 'Normal shutdown'
+    ):
         if self.is_closing or self.is_closed:
             msg = (
                 f'Illegal close({reply_code}, {reply_text}) request on {self} '
@@ -490,8 +511,10 @@ class Connection(EventDispatcherObject):
             )
 
             error = exceptions.ConnectionOpenAborted(
-                f'Connection.close() called before connection '
-                f'finished opening: prev_state={self._state} ({reply_code}): {reply_text}')
+                'Connection.close() called before connection '
+                'finished opening: prev_state='
+                f'{self._state} ({reply_code}): {reply_text}'
+            )
             self.terminate(error)
             raise error
 
@@ -508,9 +531,10 @@ class Connection(EventDispatcherObject):
                 spec.Connection.Close(error.reply_code, error.reply_text, 0, 0)
             )
             await self._wait_state(CLOSED)
-        except:
-            self.terminate(error)
+        except Exception as ex:
+            self.terminate(ex)
             raise
+        self._closing_reason = error
 
     #
     ## event callbacks
