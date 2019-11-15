@@ -821,18 +821,18 @@ class Channel(EventDispatcherObject):
             self._set_channel_state(OPEN)
 
     def terminate(self, error: BaseException = None) -> None:
-        if self.is_closed:
-            raise exceptions.ChannelWrongStateError(
-                'Trying to terminate an already closed channel'
-            )
         if error:
             if self.is_closing:
                 LOGGER.warning('Error while channel is closing')
                 return
             self._closing_reason = error
             LOGGER.error('Stream terminated in unexpected fashion: %s', error)
+        else:
+            if self.is_closed:
+                raise exceptions.ChannelWrongStateError(
+                    'Trying to terminate an already closed channel'
+                )
         self._transition_to_closed()
-        self._set_channel_state(CLOSED)
 
     def _dispatch_consumer(
         self,

@@ -245,16 +245,17 @@ class Connection(EventDispatcherObject):
             self._terminate_channel(ch)
 
     def terminate(self, error: BaseException = None) -> None:
-        if self.is_closed:
-            raise exceptions.ConnectionWrongStateError(
-                'Trying to terminate an already closed connection'
-            )
         if error:
             if self.is_closing:
                 LOGGER.warning('Error while connection is closing')
                 return
             self._closing_reason = error
             LOGGER.error('Stream terminated in unexpected fashion: %s', error)
+        else:
+            if self.is_closed:
+                raise exceptions.ConnectionWrongStateError(
+                    'Trying to terminate an already closed connection'
+                )
         self._terminate_channels(error)
         self._stream.terminate()
         self._set_connection_state(CLOSED)
