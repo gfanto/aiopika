@@ -236,13 +236,14 @@ class Connection(EventDispatcherObject):
 
     def _terminate_channel(self, ch: Channel, error: BaseException = None):
         try:
-            ch.terminate(error)
-        except:
+            ch.terminate(error or self._closing_reason)
+        except Exception as ex:
+            LOGGER.exception(f'Error happen while trying to terminate channel {ch}: "{ex}"')
             self._channels.pop(ch.channel_number, None)
 
     def _terminate_channels(self, error: BaseException = None) -> None:
         for ch in list(self._channels.values()):
-            self._terminate_channel(ch)
+            self._terminate_channel(ch, error)
 
     def terminate(self, error: BaseException = None) -> None:
         if error:
@@ -317,7 +318,7 @@ class Connection(EventDispatcherObject):
     async def _flush_data(self):
         try:
             await self._stream.flush()
-        except ConnectionResetError as ex:
+        except ConnectionResetError as ex:# @[TODO] change with proper aiopika exception
             self.terminate(ex)
 
     async def _send_frame(self, frame_value: frame.Frame):
@@ -434,7 +435,7 @@ class Connection(EventDispatcherObject):
         try:
             await self._wait_state(OPEN)
         except Exception as error:
-            self.terminate(error)
+            self.terminate(error) # @[TODO] change with proper aiopika error
             raise
 
     def _next_channel_number(self) -> int:

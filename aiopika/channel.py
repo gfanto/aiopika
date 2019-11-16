@@ -759,6 +759,11 @@ class Channel(EventDispatcherObject):
         assert not self.is_closed
         assert self._closing_reason is not None
 
+        # @[???]
+        # if self.__frame_waiter is not None:
+        #     self.__frame_waiter.check()
+        #     self.__frame_waiter = None
+
         self._set_channel_state(CLOSED)
         self._cleanup()
 
@@ -775,7 +780,9 @@ class Channel(EventDispatcherObject):
 
         await self._send_method(spec.Channel.CloseOk())
         self._closing_reason = exceptions.ChannelClosedByBroker(
-            method_frame.method.reply_code, method_frame.method.reply_text)
+            method_frame.method.reply_code,
+            method_frame.method.reply_text
+        )
 
         if not self.is_closing:
             self._transition_to_closed()
@@ -912,7 +919,6 @@ class Channel(EventDispatcherObject):
         assert method.synchronous, (
             f'Only synchronous-capable methods may be used with _rpc: {method}'
         )
-
         async with self.__rpc_lock:
             await self._send_method(method)
 
@@ -1004,7 +1010,7 @@ class AsyncChannel(Channel):
         fut.print_stack(file=traceback_buf)
         LOGGER.debug(traceback_buf.getvalue())
         if not self.is_closed:
-            self.terminate()
+            self.terminate(ex) # @[TODO] raise proper exception
 
     # def _handle_callback_ex(self, fut, ex):
     #     LOGGER.warning(
