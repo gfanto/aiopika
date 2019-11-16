@@ -1,22 +1,14 @@
 import logging
 import asyncio
-import typing
 import copy
 import platform
 import math
-import enum
-import traceback
 
 from io import StringIO
 from functools import partial
 from typing import (
-    Callable,
     Iterable,
-    Union,
     Dict,
-    List,
-    Set,
-    Any,
     Coroutine,
     Optional
 )
@@ -31,7 +23,6 @@ from .parameter import Parameters, ConnectionParameters
 from .frame import (
     is_method,
     is_protocol_header,
-    has_content,
     FrameDecoder,
     Heartbeat
 )
