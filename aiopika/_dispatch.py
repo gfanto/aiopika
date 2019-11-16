@@ -1,19 +1,14 @@
 import re
 import asyncio
-import typing
 import logging
 
 from inspect import isclass
-from copy import copy
-from typing import Callable, Union, Dict
+from typing import Callable
 
 from . import spec
 from . import amqp_object
 from . import exceptions
 from .frame import get_key
-
-
-__all__ = ['EventManagerObject', 'Waiter']
 
 
 LOGGER = logging.getLogger(__name__)
@@ -113,7 +108,7 @@ def create_task(coro, exception_handler):
             f.result()
         except asyncio.CancelledError:
             pass
-        except BaseException as ex:
+        except Exception:
             exception_handler(f, f.exception())
 
     t = asyncio.create_task(coro)
