@@ -282,7 +282,7 @@ class FrameDecoder:
         elif frame_type == spec.FRAME_HEADER:
             class_id, weight, body_size = struct.unpack_from('>HHQ', frame_data)
             properties = spec.props[class_id]()
-            out = properties.decode(frame_data[12:])
+            properties.decode(frame_data[12:])
             return Header(channel_number, body_size, properties)
 
         elif frame_type == spec.FRAME_BODY:
