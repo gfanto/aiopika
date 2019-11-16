@@ -1,17 +1,13 @@
-import collections
 import logging
 import uuid
-import enum
 import asyncio
 
 from typing import (
     Callable,
     Iterable,
-    Union,
     Dict,
     List,
     Set,
-    Coroutine,
     Optional
 )
 from inspect import iscoroutinefunction
