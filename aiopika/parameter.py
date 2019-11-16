@@ -33,15 +33,12 @@ import numbers
 import ssl
 
 from urllib.parse import (
-    quote as url_quote,
     unquote as url_unquote,
-    urlencode,
     parse_qs as url_parse_qs,
     urlparse
 )
 
 from .channel import MAX_CHANNELS
-from . import exceptions
 from . import spec
 from . import credentials
 
@@ -770,7 +767,7 @@ class URLParameters(Parameters):
         if parts.scheme == 'https':
             # Create default context which will get overridden by the
             # ssl_options URL arg, if any
-            self.ssl_options = aiopika.SSLOptions(
+            self.ssl_options = credentials.SSLOptions(
                 context=ssl.create_default_context())
         elif parts.scheme == 'http':
             self.ssl_options = None
@@ -956,7 +953,7 @@ class URLParameters(Parameters):
                 cxt.set_ciphers(opt_ciphers)
 
             server_hostname = opts.get('server_hostname')
-            self.ssl_options = aiopika.SSLOptions(
+            self.ssl_options = credentials.SSLOptions(
                 context=cxt, server_hostname=server_hostname)
 
     def _set_url_tcp_options(self, value):
