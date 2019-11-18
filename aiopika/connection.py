@@ -152,6 +152,7 @@ class Connection(EventDispatcherObject):
         self._blocked_conn_waiter = Waiter()
 
         self._heartbeat_enabled = False
+        self._closing_reason = None
 
         #self._stream = None
         #self._frame_decoder = None
