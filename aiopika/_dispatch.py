@@ -23,11 +23,11 @@ class Waiter(asyncio.Event):
         self._result = None
 
     def check(self, *args, **kwargs):
-        self.result = self._predicate(*args, **kwargs)
+        self._result = self._predicate(*args, **kwargs)
 
-        if self.result:
+        if self._result:
             self.set()
-        return self.result
+        return self._result
 
     @property
     def is_waiting(self):
