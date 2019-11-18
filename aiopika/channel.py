@@ -753,12 +753,9 @@ class Channel(EventDispatcherObject):
 
     def _transition_to_closed(self):
         assert not self.is_closed
-        assert self._closing_reason is not None
-
-        # @[???]
-        # if self.__frame_waiter is not None:
-        #     self.__frame_waiter.check()
-        #     self.__frame_waiter = None
+        if self.__frame_waiter is not None:
+            self.__frame_waiter.cancel()
+            self.__frame_waiter = None
 
         self._set_channel_state(CLOSED)
         self._cleanup()
@@ -835,6 +832,7 @@ class Channel(EventDispatcherObject):
                 raise exceptions.ChannelWrongStateError(
                     'Trying to terminate an already closed channel'
                 )
+
         self._transition_to_closed()
 
     def _dispatch_consumer(
@@ -919,9 +917,12 @@ class Channel(EventDispatcherObject):
             await self._send_method(method)
 
             if acceptable_replies:
-                await self._wait_for_reply(acceptable_replies)
-                if callback:
-                    await self._dispatch_callback(callback, *args, **kwargs)
+                try:
+                    await self._wait_for_reply(acceptable_replies)
+                    if callback:
+                        await self._dispatch_callback(callback, *args, **kwargs)
+                except asyncio.CancelledError:
+                    pass
 
     def _raise_if_not_open(self):
         if self._state == OPEN:

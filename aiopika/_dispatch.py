@@ -20,13 +20,14 @@ class Waiter(asyncio.Event):
 
         self._predicate = predicate
         self._waiting = False
+        self._result = None
 
     def check(self, *args, **kwargs):
-        result = self._predicate(*args, **kwargs)
+        self.result = self._predicate(*args, **kwargs)
 
-        if result:
+        if self.result:
             self.set()
-        return result
+        return self.result
 
     @property
     def is_waiting(self):
@@ -36,6 +37,13 @@ class Waiter(asyncio.Event):
         self._waiting = True
         await super(Waiter, self).wait()
         self._waiting = False
+        return self._result
+
+    def cancel(self):
+        was_waiting = self._waiting
+        self.clear()
+        if was_waiting:
+            raise asyncio.CancelledError()
 
     def clear(self):
         self._waiting = False

@@ -248,6 +248,7 @@ class Connection(EventDispatcherObject):
                 raise exceptions.ConnectionWrongStateError(
                     'Trying to terminate an already closed connection'
                 )
+
         self._terminate_channels(error)
         self._stream.terminate()
         self._set_connection_state(CLOSED)
