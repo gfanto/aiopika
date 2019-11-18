@@ -20,6 +20,7 @@ class Waiter(asyncio.Event):
 
         self._predicate = predicate
         self._waiting = False
+        self._canceld = False
         self._result = None
 
     def check(self, *args, **kwargs):
@@ -37,16 +38,22 @@ class Waiter(asyncio.Event):
         self._waiting = True
         await super(Waiter, self).wait()
         self._waiting = False
+        if self._canceld:
+            raise asyncio.CancelledError(
+                f'Waiter from {self._predicate} has been canceld while waiting'
+            )
         return self._result
 
     def cancel(self):
-        was_waiting = self._waiting
-        self.clear()
-        if was_waiting:
-            raise asyncio.CancelledError()
+        if self._waiting and not self._canceld:
+            self._canceld = True
+            self.set()
+            return True
+        return False
 
     def clear(self):
         self._waiting = False
+        self._canceld = False
         return super(Waiter, self).clear()
 
 
