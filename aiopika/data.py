@@ -129,19 +129,20 @@ def encode_value(pieces, value): # pylint: disable=R0911
         pieces.append(struct.pack('>cB', b't', int(value)))
         return 2
     if isinstance(value, int):
-        pieces.append(struct.pack('>cq', b'l', value))
-        return 9
-    elif isinstance(value, int):
-        with warnings.catch_warnings():
-            warnings.filterwarnings('error')
-            try:
-                packed = struct.pack('>ci', b'I', value)
-                pieces.append(packed)
-                return 5
-            except (struct.error, DeprecationWarning):
-                packed = struct.pack('>cq', b'l', int(value))
-                pieces.append(packed)
-                return 9
+        if -(2 ** 64 / 2) < value < (2 ** 64 / 2) - 1:
+            pieces.append(struct.pack('>cq', b'l', value))
+            return 9
+        else:
+            with warnings.catch_warnings():
+                warnings.filterwarnings('error')
+                try:
+                    packed = struct.pack('>ci', b'I', value)
+                    pieces.append(packed)
+                    return 5
+                except (struct.error, DeprecationWarning):
+                    packed = struct.pack('>cq', b'l', int(value))
+                    pieces.append(packed)
+                    return 9
     elif isinstance(value, decimal.Decimal):
         value = value.normalize()
         if value.as_tuple().exponent < 0:
