@@ -44,7 +44,7 @@ def wrap_callback(func):
     return wrapper
 
 
-def _validate_coroutine(self, callback):
+def _validate_coroutine(callback):
     if callback is not None and not iscoroutinefunction(callback):
         callback = wrap_callback()
     return callback
