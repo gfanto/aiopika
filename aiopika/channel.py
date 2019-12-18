@@ -206,7 +206,7 @@ class Channel(EventDispatcherObject):
 
         self._cancelled.add(consumer_tag)
 
-        await self._rpc(
+        return await self._rpc(
             spec.Basic.Cancel(consumer_tag=consumer_tag, nowait=nowait),
             [spec.Basic.CancelOk] if not nowait else [],
             callback,
@@ -312,7 +312,7 @@ class Channel(EventDispatcherObject):
         if prefetch_count < 0:
             raise ValueError(f'prefetch_count must be >= 0')
 
-        await self._rpc(
+        return await self._rpc(
             spec.Basic.Qos(prefetch_size, prefetch_count, global_qos),
             [spec.Basic.QosOk],
             callback
@@ -329,7 +329,7 @@ class Channel(EventDispatcherObject):
     ):
         _validate_coroutine(callback)
         self._raise_if_not_open()
-        await self._rpc(
+        return await self._rpc(
             spec.Basic.Recover(requeue),
             [spec.Basic.RecoverOk],
             callback
@@ -435,7 +435,7 @@ class Channel(EventDispatcherObject):
 
         self.__ack_nack_callback = ack_nack_callback
 
-        await self._rpc(
+        return await self._rpc(
             spec.Confirm.Select(nowait),
             [spec.Confirm.SelectOk] if not nowait else [],
             callback
@@ -461,7 +461,7 @@ class Channel(EventDispatcherObject):
         self._raise_if_not_open()
         nowait = callback is None and True or nowait
 
-        await self._rpc(
+        return await self._rpc(
             spec.Exchange.Bind(
                 0,
                 destination,
@@ -490,7 +490,7 @@ class Channel(EventDispatcherObject):
         self._raise_if_not_open()
         nowait = callback is None and True or nowait
 
-        await self._rpc(
+        return await self._rpc(
             spec.Exchange.Declare(0, exchange, exchange_type, passive, durable,
                                   auto_delete, internal, nowait, arguments),
             [spec.Exchange.DeclareOk] if not nowait else [],
@@ -508,7 +508,7 @@ class Channel(EventDispatcherObject):
         self._raise_if_not_open()
         nowait = callback is None and True or nowait
 
-        await self._rpc(
+        return await self._rpc(
             spec.Exchange.Delete(0, exchange, if_unused, nowait),
             [spec.Exchange.DeleteOk] if not nowait else [],
             callback
@@ -527,7 +527,7 @@ class Channel(EventDispatcherObject):
         self._raise_if_not_open()
         nowait = callback is None and True or nowait
 
-        await self._rpc(
+        return await self._rpc(
             spec.Exchange.Unbind(
                 0,
                 destination,
@@ -545,7 +545,7 @@ class Channel(EventDispatcherObject):
         self._raise_if_not_open()
 
         self.__flowok_callback = callback
-        await self._rpc(
+        return await self._rpc(
             spec.Channel.Flow(active),
             [spec.Channel.FlowOk]
         )
@@ -581,7 +581,7 @@ class Channel(EventDispatcherObject):
             )
 
         self._set_channel_state(OPENING)
-        await self._rpc(spec.Channel.Open(), [spec.Channel.OpenOk])
+        return await self._rpc(spec.Channel.Open(), [spec.Channel.OpenOk])
 
     async def _remove_consumers(self):
         await asyncio.gather(
@@ -611,7 +611,7 @@ class Channel(EventDispatcherObject):
         await self._remove_consumers()
         self._set_channel_state(CLOSING)
 
-        await self._rpc(
+        return await self._rpc(
             spec.Channel.Close(reply_code, reply_text, 0, 0),
             [spec.Channel.CloseOk]
         )
@@ -631,7 +631,7 @@ class Channel(EventDispatcherObject):
 
         if routing_key is None:
             routing_key = queue
-        await self._rpc(
+        return await self._rpc(
             spec.Queue.Bind(0, queue, exchange, routing_key, nowait, arguments),
             [spec.Queue.BindOk] if not nowait else [],
             callback
@@ -652,7 +652,7 @@ class Channel(EventDispatcherObject):
         self._raise_if_not_open()
         nowait = callback is None and True or nowait
 
-        await self._rpc(
+        return await self._rpc(
             spec.Queue.Declare(
                 0,
                 queue,
@@ -679,7 +679,7 @@ class Channel(EventDispatcherObject):
         self._raise_if_not_open()
         nowait = callback is None and True or nowait
 
-        await self._rpc(
+        return await self._rpc(
             spec.Queue.Delete(0, queue, if_unused, if_empty, nowait),
             [spec.Queue.DeleteOk] if not nowait else [],
             callback
@@ -690,7 +690,7 @@ class Channel(EventDispatcherObject):
         self._raise_if_not_open()
         nowait = callback  is None
 
-        await self._rpc(
+        return await self._rpc(
             spec.Queue.Purge(0, queue, nowait),
             [spec.Queue.PurgeOk] if nowait else [],
             callback
@@ -712,7 +712,7 @@ class Channel(EventDispatcherObject):
 
         if routing_key is None:
             routing_key = queue
-        await self._rpc(
+        return await self._rpc(
             spec.Queue.Unbind(0, queue, exchange, routing_key, arguments),
             [spec.Queue.UnbindOk],
             callback
@@ -736,17 +736,17 @@ class Channel(EventDispatcherObject):
     async def tx_commit(self, callback: Callable = None):
         _validate_coroutine(callback)
         self._raise_if_not_open()
-        await self._rpc(spec.Tx.Commit(), [spec.Tx.CommitOk], callback)
+        return await self._rpc(spec.Tx.Commit(), [spec.Tx.CommitOk], callback)
 
     async def tx_rollback(self, callback: Callable = None):
         _validate_coroutine(callback)
         self._raise_if_not_open()
-        await self._rpc(spec.Tx.Rollback(), [spec.Tx.RollbackOk], callback)
+        return await self._rpc(spec.Tx.Rollback(), [spec.Tx.RollbackOk], callback)
 
     async def tx_select(self, callback: Callable = None):
         _validate_coroutine(callback)
         self._raise_if_not_open()
-        await self._rpc(spec.Tx.Select(), [spec.Tx.SelectOk], callback)
+        return await self._rpc(spec.Tx.Select(), [spec.Tx.SelectOk], callback)
 
     async def _on_tx_selectok(self, method_frame: frame.Method):
         LOGGER.debug('Tx.SelectOk Received: %s', method_frame)
@@ -1100,3 +1100,4 @@ class BlockingChannel(AsyncChannel):
     def _transition_to_closed(self):
         self.terminate_consuming()
         super()._transition_to_closed()
+
