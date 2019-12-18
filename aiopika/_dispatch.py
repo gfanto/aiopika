@@ -23,8 +23,8 @@ class Waiter(asyncio.Event):
         self._canceld = False
         self._result = None
 
-    def check(self, *args, **kwargs):
-        self._result = self._predicate(*args, **kwargs)
+    def check(self, *args, **kwds):
+        self._result = self._predicate(*args, **kwds)
 
         if self._result:
             self.set()

@@ -586,7 +586,8 @@ class ConnectionParameters(Parameters):
             blocked_connection_timeout=_DEFAULT,
             client_properties=_DEFAULT,
             tcp_options=_DEFAULT,
-            **kwargs):
+            **kwds
+        ):
         """Create a new ConnectionParameters instance. See `Parameters` for
         default values.
 
@@ -679,8 +680,8 @@ class ConnectionParameters(Parameters):
         if tcp_options is not self._DEFAULT:
             self.tcp_options = tcp_options
 
-        if kwargs:
-            raise TypeError('unexpected kwargs: %r' % (kwargs,))
+        if kwds:
+            raise TypeError('unexpected kwds: %r' % (kwds,))
 
 
 class URLParameters(Parameters):
@@ -712,7 +713,7 @@ class URLParameters(Parameters):
             Override the default `en_US` locale value
         - ssl_options:
             None for plaintext; for SSL: dict of public ssl context-related
-            arguments that may be passed to :meth:`ssl.SSLSocket` as kwargs,
+            arguments that may be passed to :meth:`ssl.SSLSocket` as kwds,
             except `sock`, `server_side`,`do_handshake_on_connect`, `family`,
             `type`, `proto`, `fileno`.
         - retry_delay:
@@ -920,7 +921,7 @@ class URLParameters(Parameters):
                     'the specified https URL scheme.')
         else:
             # Older versions of aiopika would take the opts dict and pass it
-            # directly as kwargs to the deprecated ssl.wrap_socket method.
+            # directly as kwds to the deprecated ssl.wrap_socket method.
             # Here, we take the valid options and translate them into args
             # for various SSLContext methods.
             #

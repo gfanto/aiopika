@@ -37,6 +37,11 @@ LOGGER = logging.getLogger(__name__)
 MAX_CHANNELS = 65535  # per AMQP 0.9.1 spec.
 
 
+def _validate_coroutine(callback):
+    if callback is not None and not iscoroutinefunction(callback):
+        raise TypeError('Callback must be async function')
+
+
 class _ContentFrameAssembler(object):
     _method_frame: frame.Frame
     _header_frame: frame.Frame
@@ -155,12 +160,12 @@ class Channel(EventDispatcherObject):
             self._state, self.connection)
 
     def add_on_flow_callback(self, callback: Callable):
-        self._validate_coroutine(callback)
+        _validate_coroutine(callback)
         self._has_on_flow_callback = True
         self.__flowok_callback = callback
 
     def add_on_return_callback(self, callback: Callable):
-        self._validate_coroutine(callback)
+        _validate_coroutine(callback)
         self.__return_callback = callback
 
     async def basic_ack(self, delivery_tag: int = 0, multiple: bool = False):
@@ -173,7 +178,7 @@ class Channel(EventDispatcherObject):
         callback: Callable = None,
         nowait: bool = True
     ):
-        self._validate_coroutine(callback)
+        _validate_coroutine(callback)
         self._raise_if_not_open()
         nowait = callback is None and True or nowait
 
@@ -205,7 +210,7 @@ class Channel(EventDispatcherObject):
             spec.Basic.Cancel(consumer_tag=consumer_tag, nowait=nowait),
             [spec.Basic.CancelOk] if not nowait else [],
             callback,
-            kwargs={'consumer_tag': consumer_tag}
+            kwds={'consumer_tag': consumer_tag}
         )
 
     async def basic_consume(
@@ -219,7 +224,8 @@ class Channel(EventDispatcherObject):
         callback: Callable = None,
         nowait: bool = True
     ):
-        self._validate_coroutine(callback, on_message_callback)
+        _validate_coroutine(callback)
+        _validate_coroutine(on_message_callback)
         self._raise_if_not_open()
         nowait = callback is None and True or nowait
 
@@ -244,7 +250,7 @@ class Channel(EventDispatcherObject):
             ),
             [spec.Basic.ConsumeOk],
             callback,
-            kwargs={'consumer_tag': consumer_tag}
+            kwds={'consumer_tag': consumer_tag}
         )
 
         return consumer_tag
@@ -258,7 +264,7 @@ class Channel(EventDispatcherObject):
         callback: Callable,
         auto_ack: bool = False,
     ):
-        self._validate_coroutine(callback)
+        _validate_coroutine(callback)
         self._raise_if_not_open()
         if self.__getok_callback is not None:
             raise exceptions.DuplicateGetOkCallback()
@@ -298,7 +304,7 @@ class Channel(EventDispatcherObject):
         global_qos: bool = False,
         callback: Callable = None
     ):
-        self._validate_coroutine(callback)
+        _validate_coroutine(callback)
         self._raise_if_not_open()
 
         if prefetch_size < 0:
@@ -321,7 +327,7 @@ class Channel(EventDispatcherObject):
         requeue: bool = False,
         callback: Callable = None
     ):
-        self._validate_coroutine(callback)
+        _validate_coroutine(callback)
         self._raise_if_not_open()
         await self._rpc(
             spec.Basic.Recover(requeue),
@@ -418,7 +424,7 @@ class Channel(EventDispatcherObject):
         callback: Callable = None,
         nowait: bool = True
     ):
-        self._validate_coroutine(callback)
+        _validate_coroutine(callback)
         self._raise_if_not_open()
         nowait = callback is None and True or nowait
 
@@ -451,7 +457,7 @@ class Channel(EventDispatcherObject):
         callback: Callable = None,
         nowait: bool = True
     ):
-        self._validate_coroutine(callback)
+        _validate_coroutine(callback)
         self._raise_if_not_open()
         nowait = callback is None and True or nowait
 
@@ -480,7 +486,7 @@ class Channel(EventDispatcherObject):
         callback: Callable = None,
         nowait: bool = True
     ):
-        self._validate_coroutine(callback)
+        _validate_coroutine(callback)
         self._raise_if_not_open()
         nowait = callback is None and True or nowait
 
@@ -498,7 +504,7 @@ class Channel(EventDispatcherObject):
         callback: Callable = None,
         nowait: bool = True
     ):
-        self._validate_coroutine(callback)
+        _validate_coroutine(callback)
         self._raise_if_not_open()
         nowait = callback is None and True or nowait
 
@@ -517,7 +523,7 @@ class Channel(EventDispatcherObject):
         callback: Callable = None,
         nowait: bool = True
     ):
-        self._validate_coroutine(callback)
+        _validate_coroutine(callback)
         self._raise_if_not_open()
         nowait = callback is None and True or nowait
 
@@ -535,7 +541,7 @@ class Channel(EventDispatcherObject):
         )
 
     async def flow(self, active: bool, callback: Callable):
-        self._validate_coroutine(callback)
+        _validate_coroutine(callback)
         self._raise_if_not_open()
 
         self.__flowok_callback = callback
@@ -619,7 +625,7 @@ class Channel(EventDispatcherObject):
         callback: Callable = None,
         nowait: bool = True
     ):
-        self._validate_coroutine(callback)
+        _validate_coroutine(callback)
         self._raise_if_not_open()
         nowait = callback is None and True or nowait
 
@@ -642,13 +648,21 @@ class Channel(EventDispatcherObject):
         callback: Callable = None,
         nowait: bool = True
     ):
-        self._validate_coroutine(callback)
+        _validate_coroutine(callback)
         self._raise_if_not_open()
         nowait = callback is None and True or nowait
 
         await self._rpc(
-            spec.Queue.Declare(0, queue, passive, durable, exclusive,
-                               auto_delete, nowait, arguments),
+            spec.Queue.Declare(
+                0,
+                queue,
+                passive,
+                durable,
+                exclusive,
+                auto_delete,
+                nowait,
+                arguments
+            ),
             [spec.Queue.DeclareOk] if not nowait else [],
             callback
         )
@@ -661,7 +675,7 @@ class Channel(EventDispatcherObject):
         callback: Callable = None,
         nowait: bool = True
     ):
-        self._validate_coroutine(callback)
+        _validate_coroutine(callback)
         self._raise_if_not_open()
         nowait = callback is None and True or nowait
 
@@ -672,11 +686,12 @@ class Channel(EventDispatcherObject):
         )
 
     async def queue_purge(self, queue: str, callback: Callable = None):
-        self._validate_coroutine(callback)
+        _validate_coroutine(callback)
         self._raise_if_not_open()
         nowait = callback  is None
 
-        await self._rpc(spec.Queue.Purge(0, queue, nowait),
+        await self._rpc(
+            spec.Queue.Purge(0, queue, nowait),
             [spec.Queue.PurgeOk] if nowait else [],
             callback
 
@@ -691,7 +706,7 @@ class Channel(EventDispatcherObject):
         callback: Callable = None,
         nowait: bool = True
     ):
-        self._validate_coroutine(callback)
+        _validate_coroutine(callback)
         self._raise_if_not_open()
         # @[???] nowait check
 
@@ -719,17 +734,17 @@ class Channel(EventDispatcherObject):
         LOGGER.debug('Queue.DeleteOk Received: %s', method_frame)
 
     async def tx_commit(self, callback: Callable = None):
-        self._validate_coroutine(callback)
+        _validate_coroutine(callback)
         self._raise_if_not_open()
         await self._rpc(spec.Tx.Commit(), [spec.Tx.CommitOk], callback)
 
     async def tx_rollback(self, callback: Callable = None):
-        self._validate_coroutine(callback)
+        _validate_coroutine(callback)
         self._raise_if_not_open()
         await self._rpc(spec.Tx.Rollback(), [spec.Tx.RollbackOk], callback)
 
     async def tx_select(self, callback: Callable = None):
-        self._validate_coroutine(callback)
+        _validate_coroutine(callback)
         self._raise_if_not_open()
         await self._rpc(spec.Tx.Select(), [spec.Tx.SelectOk], callback)
 
@@ -849,9 +864,8 @@ class Channel(EventDispatcherObject):
             body
         )
 
-    def _dispatch_callback(self, callback, *args, **kwargs):
-        assert iscoroutinefunction(callback)
-        return callback(*args, **kwargs)
+    def _dispatch_callback(self, callback, method_frame, *args, **kwds):
+        return callback(self, method_frame, *args, **kwds)
 
     def _dispatch_frame(self, frame_value: frame.Frame):
         return self._dispatch_event(frame_value)(frame_value)
@@ -893,14 +907,21 @@ class Channel(EventDispatcherObject):
 
     async def _wait_for_reply(self, acceptable_replies: Iterable):
         assert self.__frame_waiter is None, 'Trying to override frame waiter'
-        self.__frame_waiter = Waiter(
-            lambda frame_value: is_method_instance_of(
-                self.channel_number, acceptable_replies, frame_value
-            )
-        )
+        def check_method(frame_value):
+            if (
+                is_method_instance_of(
+                    self.channel_number,
+                    acceptable_replies,
+                    frame_value
+                )
+            ):
+                return frame_value
 
-        await self.__frame_waiter.wait()
+        self.__frame_waiter = Waiter(check_method)
+
+        return_value = self.__frame_waiter.wait()
         self.__frame_waiter = None
+        return return_value
 
     async def _rpc(
         self,
@@ -908,7 +929,7 @@ class Channel(EventDispatcherObject):
         acceptable_replies: Iterable,
         callback: Callable = None,
         args=(),
-        kwargs={}
+        kwds={}
     ):
         assert method.synchronous, (
             f'Only synchronous-capable methods may be used with _rpc: {method}'
@@ -918,9 +939,18 @@ class Channel(EventDispatcherObject):
 
             if acceptable_replies:
                 try:
-                    await self._wait_for_reply(acceptable_replies)
+                    method_frame = await self._wait_for_reply(
+                        acceptable_replies
+                    )
+                    assert method_frame is not None
+
                     if callback:
-                        await self._dispatch_callback(callback, *args, **kwargs)
+                        return await self._dispatch_callback(
+                            callback,
+                            method_frame,
+                            *args,
+                            **kwds
+                        )
                 except asyncio.CancelledError:
                     pass
 
@@ -935,11 +965,6 @@ class Channel(EventDispatcherObject):
         else:
             assert self._state == CLOSED
             raise exceptions.ChannelWrongStateError('Channel is closed.')
-
-    def _validate_coroutine(self, *args):
-        for callback in filter(None, args):
-            if not iscoroutinefunction(callback):
-                raise TypeError('Callback must be async function')
 
     async def _send_method(
         self,
@@ -975,9 +1000,9 @@ class AsyncChannel(Channel):
             partial(self._handle_consumer_ex, consumer_tag)
         )
 
-    # async def _dispatch_callback(self, callback, *args, **kwargs):
+    # async def _dispatch_callback(self, callback, *args, **kwds):
     #     return create_task(
-    #         super()._dispatch_callback(callback, *args, **kwargs),
+    #         super()._dispatch_callback(callback, *args, **kwds),
     #         self._handle_callback_ex
     #     )
 
