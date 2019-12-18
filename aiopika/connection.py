@@ -783,7 +783,7 @@ class Connection(EventDispatcherObject):
                 '_on_connection_unblocked called'
             )
             return
-        self._blocked_conn_waiter.check()
+        self._blocked_conn_waiter.check(True)
 
     async def _on_connection_openok(self, method_frame):
         self.known_hosts = method_frame.method.known_hosts

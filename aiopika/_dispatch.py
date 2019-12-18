@@ -12,49 +12,60 @@ from .frame import get_key
 
 
 LOGGER = logging.getLogger(__name__)
-
+_SENTINEL = object()
 
 class Waiter(asyncio.Event):
-    def __init__(self, predicate=lambda: True, *, loop=None):
+    def __init__(self, predicate=lambda value: value, *, loop=None):
         super(Waiter, self).__init__(loop=loop)
 
         self._predicate = predicate
-        self._waiting = False
+        self._reset()
+
+    def _reset(self):
         self._canceld = False
-        self._result = None
+        self._waiting = False
+        self._stored_value = _SENTINEL
 
-    def check(self, *args, **kwds):
-        self._result = self._predicate(*args, **kwds)
+    def check(self, value):
+        predicate_result = self._predicate(value)
+        if predicate_result:
+            self._stored_value = value
+            super().set()
 
-        if self._result:
-            self.set()
-        return self._result
+        return predicate_result
+
+    def set(self):
+        raise NotImplementedError("Set should not be called in Waiter class")
 
     @property
     def is_waiting(self):
         return self._waiting
 
-    async def wait(self):
+    async def wait(self, *args, **kwds):
         self._waiting = True
-        await super(Waiter, self).wait()
+        await super().wait()
         self._waiting = False
         if self._canceld:
             raise asyncio.CancelledError(
                 f'Waiter from {self._predicate} has been canceld while waiting'
             )
-        return self._result
+
+        assert self._stored_value is not _SENTINEL
+        return_value = self._stored_value
+        self._stored_value = _SENTINEL
+        return return_value
 
     def cancel(self):
         if self._waiting and not self._canceld:
             self._canceld = True
-            self.set()
+            super().set()
             return True
         return False
 
     def clear(self):
-        self._waiting = False
-        self._canceld = False
-        return super(Waiter, self).clear()
+        clear_result = super(Waiter, self).clear()
+        self._reset()
+        return clear_result
 
 
 class EventDispatcherObject:

@@ -907,19 +907,15 @@ class Channel(EventDispatcherObject):
 
     async def _wait_for_reply(self, acceptable_replies: Iterable):
         assert self.__frame_waiter is None, 'Trying to override frame waiter'
-        def check_method(frame_value):
-            if (
-                is_method_instance_of(
-                    self.channel_number,
-                    acceptable_replies,
-                    frame_value
-                )
-            ):
-                return frame_value
 
-        self.__frame_waiter = Waiter(check_method)
-
-        return_value = self.__frame_waiter.wait()
+        self.__frame_waiter = Waiter(
+            lambda frame_value: is_method_instance_of(
+                self.channel_number,
+                acceptable_replies,
+                frame_value
+            )
+        )
+        return_value = await self.__frame_waiter.wait()
         self.__frame_waiter = None
         return return_value
 
@@ -1098,7 +1094,7 @@ class BlockingChannel(AsyncChannel):
 
     def terminate_consuming(self):
         if self.__consume_waiter is not None:
-            self.__consume_waiter.check()
+            self.__consume_waiter.check(True)
             self.__consume_waiter =  None
 
     def _transition_to_closed(self):
