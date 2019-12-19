@@ -180,7 +180,7 @@ class Channel(EventDispatcherObject):
     ):
         _validate_coroutine(callback)
         self._raise_if_not_open()
-        nowait = callback is None and True or nowait
+        nowait = nowait and callback is None
 
         if consumer_tag in self._cancelled:
             LOGGER.warning(
@@ -227,7 +227,7 @@ class Channel(EventDispatcherObject):
         _validate_coroutine(callback)
         _validate_coroutine(on_message_callback)
         self._raise_if_not_open()
-        nowait = callback is None and True or nowait
+        nowait = nowait and callback is None
 
         if not consumer_tag:
             consumer_tag = self._generate_consumer_tag()
@@ -426,7 +426,7 @@ class Channel(EventDispatcherObject):
     ):
         _validate_coroutine(callback)
         self._raise_if_not_open()
-        nowait = callback is None and True or nowait
+        nowait = nowait and callback is None
 
         if not (self.connection.publisher_confirms and
                 self.connection.basic_nack):
@@ -459,7 +459,7 @@ class Channel(EventDispatcherObject):
     ):
         _validate_coroutine(callback)
         self._raise_if_not_open()
-        nowait = callback is None and True or nowait
+        nowait = nowait and callback is None
 
         return await self._rpc(
             spec.Exchange.Bind(
@@ -488,7 +488,7 @@ class Channel(EventDispatcherObject):
     ):
         _validate_coroutine(callback)
         self._raise_if_not_open()
-        nowait = callback is None and True or nowait
+        nowait = nowait and callback is None
 
         return await self._rpc(
             spec.Exchange.Declare(0, exchange, exchange_type, passive, durable,
@@ -506,7 +506,7 @@ class Channel(EventDispatcherObject):
     ):
         _validate_coroutine(callback)
         self._raise_if_not_open()
-        nowait = callback is None and True or nowait
+        nowait = nowait and callback is None
 
         return await self._rpc(
             spec.Exchange.Delete(0, exchange, if_unused, nowait),
@@ -525,7 +525,7 @@ class Channel(EventDispatcherObject):
     ):
         _validate_coroutine(callback)
         self._raise_if_not_open()
-        nowait = callback is None and True or nowait
+        nowait = nowait and callback is None
 
         return await self._rpc(
             spec.Exchange.Unbind(
@@ -627,7 +627,7 @@ class Channel(EventDispatcherObject):
     ):
         _validate_coroutine(callback)
         self._raise_if_not_open()
-        nowait = callback is None and True or nowait
+        nowait = nowait and callback is None
 
         if routing_key is None:
             routing_key = queue
@@ -650,7 +650,8 @@ class Channel(EventDispatcherObject):
     ):
         _validate_coroutine(callback)
         self._raise_if_not_open()
-        nowait = callback is None and True or nowait
+        not (callback is not None or not nowait)
+        nowait = nowait and callback is None
 
         return await self._rpc(
             spec.Queue.Declare(
@@ -677,7 +678,7 @@ class Channel(EventDispatcherObject):
     ):
         _validate_coroutine(callback)
         self._raise_if_not_open()
-        nowait = callback is None and True or nowait
+        nowait = nowait and callback is None
 
         return await self._rpc(
             spec.Queue.Delete(0, queue, if_unused, if_empty, nowait),

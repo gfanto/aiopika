@@ -466,7 +466,12 @@ class Connection(EventDispatcherObject):
         del self._channels[ch.channel_number]
         LOGGER.debug('Removed channel %s', ch.channel_number)
 
-    async def _close_channel(self, ch: Channel, reply_code: int, reply_text: str):
+    async def _close_channel(
+        self,
+        ch: Channel,
+        reply_code: int,
+        reply_text: str
+    ):
         try:
             await ch.close(reply_code, reply_text)
         except:
