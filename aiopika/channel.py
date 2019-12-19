@@ -938,8 +938,6 @@ class Channel(EventDispatcherObject):
                     method_frame = await self._wait_for_reply(
                         acceptable_replies
                     )
-                    assert method_frame is not None
-
                     if callback:
                         return await self._dispatch_callback(
                             callback,
