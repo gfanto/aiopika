@@ -864,8 +864,8 @@ class Channel(EventDispatcherObject):
             body
         )
 
-    def _dispatch_callback(self, callback, method_frame, *args, **kwds):
-        return callback(self, method_frame, *args, **kwds)
+    def _dispatch_callback(self, callback, *args, **kwds):
+        return callback(self, *args, **kwds)
 
     def _dispatch_frame(self, frame_value: frame.Frame):
         return self._dispatch_event(frame_value)(frame_value)
