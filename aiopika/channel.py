@@ -8,10 +8,10 @@ from typing import (
     Dict,
     List,
     Set,
-    Optional
+    Optional,
 )
 from inspect import iscoroutinefunction
-from functools import partial
+from functools import partial, wraps
 from io import StringIO
 
 from . import frame
@@ -119,7 +119,6 @@ class Channel(EventDispatcherObject):
 
     _closing_reason: Optional[BaseException]
 
-    __flowok_callback: Optional[Callable]
     __ack_nack_callback: Optional[Callable]
     __return_callback: Optional[Callable]
     __getok_callback: Optional[Callable]
@@ -134,6 +133,7 @@ class Channel(EventDispatcherObject):
 
         self.channel_number = channel_number
         self.connection = connection
+
         self.flow_active = True
 
         self._content_assembler = _ContentFrameAssembler()
@@ -146,7 +146,6 @@ class Channel(EventDispatcherObject):
 
         self.__getok_callback = None
         self.__ack_nack_callback = None
-        self.__flowok_callback = None
 
         self.__rpc_lock = asyncio.Lock()
         self.__frame_waiter = None
@@ -158,11 +157,6 @@ class Channel(EventDispatcherObject):
         return '<%s number=%s %s conn=%r>' % (
             self.__class__.__name__, self.channel_number,
             self._state, self.connection)
-
-    def add_on_flow_callback(self, callback: Callable):
-        _validate_coroutine(callback)
-        self._has_on_flow_callback = True
-        self.__flowok_callback = callback
 
     def add_on_return_callback(self, callback: Callable):
         _validate_coroutine(callback)
@@ -269,6 +263,8 @@ class Channel(EventDispatcherObject):
         if self.__getok_callback is not None:
             raise exceptions.DuplicateGetOkCallback()
         self.__getok_callback = callback
+
+        # cannot use rpc call because Basic.Get has no nowait field
         await self._send_method(spec.Basic.Get(queue=queue, no_ack=auto_ack))
 
     async def basic_nack(self, delivery_tag=None, multiple=False, requeue=True):
@@ -540,14 +536,22 @@ class Channel(EventDispatcherObject):
             callback
         )
 
-    async def flow(self, active: bool, callback: Callable):
+    async def flow(self, active: bool, callback: Callable = None):
         _validate_coroutine(callback)
         self._raise_if_not_open()
 
-        self.__flowok_callback = callback
+        #this function makes the callback pika compatible
+        if callback is not None:
+            @wraps(callback)
+            async def wrapper(channel, method_frame, *args, **kwds):
+                return await callback(channel, method_frame.method.active)
+        else:
+            wrapper = None
+
         return await self._rpc(
             spec.Channel.Flow(active),
-            [spec.Channel.FlowOk]
+            [spec.Channel.FlowOk],
+            wrapper
         )
 
     async def _on_exchange_bindok(self,  method_frame):
@@ -813,19 +817,10 @@ class Channel(EventDispatcherObject):
         self._transition_to_closed()
 
     async def _on_channel_flow(self, _method_frame_unused: frame.Method):
-        if self._has_on_flow_callback is False:
-            LOGGER.warning('Channel.Flow received from server')
+        LOGGER.info('Channel.Flow received from server')
 
     async def _on_channel_flowok(self, method_frame: frame.Method):
         self.flow_active = method_frame.method.active
-        if self.__flowok_callback:
-            await self._dispatch_callback(
-                self.__flowok_callback,
-                method_frame.method.active
-            )
-            self.__flowok_callback = None
-        else:
-            LOGGER.warning('Channel.FlowOk received with no active callbacks')
 
     async def _on_channel_openok(self, method_frame: frame.Method):
         if self.is_closing:
